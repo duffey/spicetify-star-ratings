@@ -1,0 +1,11 @@
+{
+  "name": "Star Ratings",
+  "description": "Rate songs with stars and automatically save them to playlists.",
+  "preview": "screenshot.png",
+  "main": "starRatings.js",
+  "readme": "README.md",
+  "authors": [
+      { "name": "Scott Duffey", "url": "https://github.com/duffey" }
+  ],
+  "tags": ["star", "rating"]
+}
