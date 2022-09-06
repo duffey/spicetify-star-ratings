@@ -1,11 +1,41 @@
 // @ts-check
 // NAME: Star Ratings
 // AUTHOR: Scott Duffey
-// VERSION: 1.0
+// VERSION: 1.1
 // DESCRIPTION: Rate songs with stars and automatically save them to playlists
 
 /// <reference path='../globals.d.ts' />
 //
+
+let SETTINGS = null;
+
+async function getLocalStorageData(key) {
+    return Spicetify.LocalStorage.get(key);
+}
+
+async function setLocalStorageData(key, value) {
+    Spicetify.LocalStorage.set(key, value);
+}
+
+async function getSettings() {
+    try {
+        const parsed = JSON.parse(await getLocalStorageData('starRatings:settings'));
+        if (parsed && typeof parsed === 'object') {
+            return parsed;
+        }
+        throw '';
+    } catch {
+        await setLocalStorageData('starRatings:settings', `{}`);
+        return {
+            halfStarRatings: true,
+            likeThreshold: '4.0'
+        };
+    }
+}
+
+async function saveSettings() {
+    await setLocalStorageData('starRatings:settings', JSON.stringify(SETTINGS));
+}
 
 const RATINGS = ['0.0', '0.5', '1.0', '1.5', '2.0', '2.5', '3.0', '3.5', '4.0', '4.5', '5.0'];
 
@@ -32,9 +62,22 @@ async function showNotification(text) {
 }
 
 async function createPlaylist(name, folderUid) {
-    await Spicetify.Platform.RootlistAPI.createPlaylist(name, {
+    return await Spicetify.Platform.RootlistAPI.createPlaylist(name, {
         after: folderUid
     });
+}
+
+async function makePlaylistPrivate(playlistUri) {
+    try {
+        await Spicetify.CosmosAsync.post(`sp://core-playlist/v1/playlist/${playlistUri}/set-base-permission`, {
+            permission_level: 'BLOCKED'
+        });
+    } catch (error) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await Spicetify.CosmosAsync.post(`sp://core-playlist/v1/playlist/${playlistUri}/set-base-permission`, {
+            permission_level: 'BLOCKED'
+        });
+    }
 }
 
 async function createFolder(name) {
@@ -90,7 +133,7 @@ async function addTrackToPlaylist(playlistId, trackUri) {
             uris: [trackUri]
         })
     } catch (error) {
-        await new Promise(resolve => setTimeout(resolve, 500))
+        await new Promise(resolve => setTimeout(resolve, 500));
         await Spicetify.CosmosAsync.post(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
             uris: [trackUri]
         })
@@ -135,7 +178,7 @@ async function getRatings() {
     const [playlists, ratedFolder] = await getRatedPlaylists()
     const ratings = {};
     for (const rating in playlists) {
-        const items = await getPlaylistItems(playlists[rating].uri)
+        const items = await getPlaylistItems(playlists[rating].uri);
         for (const item of items) {
             const uri = item.link;
             if (!ratings[uri]) {
@@ -184,18 +227,18 @@ function createStar(starsId, n) {
     gradient.append(stopFirst);
     stopFirst.id = `${id}-gradient-first`;
     stopFirst.setAttributeNS(null, 'offset', '50%');
-    stopFirst.setAttributeNS(null, 'stop-color', '#5e5e5e');
+    stopFirst.setAttributeNS(null, 'stop-color', 'var(--spice-button-disabled)');
 
     const stopSecond = document.createElementNS(xmlns, 'stop');
     gradient.append(stopSecond);
     stopSecond.id = `${id}-gradient-second`;
     stopSecond.setAttributeNS(null, 'offset', '50%');
-    stopSecond.setAttributeNS(null, 'stop-color', '#5e5e5e');
+    stopSecond.setAttributeNS(null, 'stop-color', 'var(--spice-button-disabled)');
 
     const path = document.createElementNS(xmlns, 'path');
     star.append(path);
     path.setAttributeNS(null, 'fill', `url(#${gradient.id})`);
-    path.setAttributeNS(null, 'd', 'M20.388,10.918L32,12.118l-8.735,7.749L25.914,31.4l-9.893-6.088L6.127,31.4l2.695-11.533L0,12.118l11.547-1.2L16.026,0.6L20.388,10.918z')
+    path.setAttributeNS(null, 'd', 'M20.388,10.918L32,12.118l-8.735,7.749L25.914,31.4l-9.893-6.088L6.127,31.4l2.695-11.533L0,12.118l11.547-1.2L16.026,0.6L20.388,10.918z');
 
     return [star, stopFirst, stopSecond];
 }
@@ -300,17 +343,17 @@ function setRating(starElements, rating) {
     for (let i = 0; i < 5; i++) {
         const stopFirst = starElements[i][1];
         const stopSecond = starElements[i][2];
-        stopFirst.setAttributeNS(null, 'stop-color', '#5e5e5e');
-        stopSecond.setAttributeNS(null, 'stop-color', '#5e5e5e');
+        stopFirst.setAttributeNS(null, 'stop-color', 'var(--spice-button-disabled)');
+        stopSecond.setAttributeNS(null, 'stop-color', 'var(--spice-button-disabled)');
     }
     for (let i = 0; i < halfStars; i++) {
         const j = Math.floor(i / 2);
         const stopFirst = starElements[j][1];
         const stopSecond = starElements[j][2];
         if (i % 2 === 0) {
-            stopFirst.setAttributeNS(null, 'stop-color', '#1ed760');
+            stopFirst.setAttributeNS(null, 'stop-color', 'var(--spice-button)');
         } else {
-            stopSecond.setAttributeNS(null, 'stop-color', '#1ed760');
+            stopSecond.setAttributeNS(null, 'stop-color', 'var(--spice-button)');
         }
     }
 }
@@ -318,24 +361,238 @@ function setRating(starElements, rating) {
 function getMouseoverRating(star, i) {
     const rect = star.getBoundingClientRect();
     const offset = event.clientX - rect.left;
-    const half = offset > 8;
+    const half = offset > 8 || !SETTINGS.halfStarRatings;
     const zeroStars = i === 0 && offset < 3;
-    return (i + 0.5 + (half ? 0.5 : 0.00) - (zeroStars ? 0.5 : 0.0)).toFixed(1);
+    let rating = i + 1;
+    if (!half)
+        rating -= 0.5;
+    if (zeroStars) {
+        rating -= SETTINGS.halfStarRatings ? 0.5 : 1.0;
+    }
+    return rating.toFixed(1);
+}
+
+function displayIcon({
+    icon,
+    size
+}) {
+    return Spicetify.React.createElement('svg', {
+        width: size,
+        height: size,
+        viewBox: '0 0 16 16',
+        fill: 'currentColor',
+        dangerouslySetInnerHTML: {
+            __html: icon,
+        },
+    });
+}
+
+function checkBoxItem({
+    name,
+    field,
+    onclick
+}) {
+    let [value, setValue] = Spicetify.React.useState(SETTINGS[field]);
+    return Spicetify.React.createElement(
+        'div', {
+            className: 'popup-row'
+        },
+        Spicetify.React.createElement('label', {
+            className: 'col description'
+        }, name),
+        Spicetify.React.createElement(
+            'div', {
+                className: 'col action'
+            },
+            Spicetify.React.createElement(
+                'button', {
+                    className: 'checkbox' + (value ? '' : ' disabled'),
+                    onClick: async () => {
+                        let state = !value;
+                        SETTINGS[field] = state;
+                        setValue(state);
+                        await saveSettings();
+                        onclick();
+                    },
+                },
+                Spicetify.React.createElement(displayIcon, {
+                    icon: Spicetify.SVGIcons.check,
+                    size: 16
+                })
+            )
+        )
+    );
+}
+
+function dropDownItem({
+    name,
+    field,
+    options,
+    onclick
+}) {
+    const [value, setValue] = Spicetify.React.useState(SETTINGS[field]);
+    return Spicetify.React.createElement(
+        'div', {
+            className: 'popup-row'
+        },
+        Spicetify.React.createElement('label', {
+            className: 'col description'
+        }, name),
+        Spicetify.React.createElement(
+            'div', {
+                className: 'col action'
+            },
+            Spicetify.React.createElement(
+                'select', {
+                    value,
+                    onChange: async (e) => {
+                        setValue(e.target.value);
+                        SETTINGS[field] = e.target.value;
+                        await saveSettings();
+                        onclick();
+                    },
+                },
+                Object.keys(options).map((item) =>
+                    Spicetify.React.createElement(
+                        'option', {
+                            value: item,
+                        },
+                        options[item]
+                    )
+                )
+            )
+        )
+    );
+}
+
+function displaySettings() {
+    const style = Spicetify.React.createElement(
+        'style',
+        null,
+        `.popup-row::after {
+                    content: "";
+                    display: table;
+                    clear: both;
+                }
+                .popup-row .col {
+                    display: flex;
+                    padding: 10px 0;
+                    align-items: center;
+                }
+                .popup-row .col.description {
+                    float: left;
+                    padding-right: 15px;
+                }
+                .popup-row .col.action {
+                    float: right;
+                    text-align: right;
+                }
+                .popup-row .div-title {
+                    color: var(--spice-text);
+                }
+                .popup-row .divider {
+                    height: 2px;
+                    border-width: 0;
+                    background-color: var(--spice-button-disabled);
+                }
+                .popup-row .space {
+                    margin-bottom: 20px;
+                    visibility: hidden;
+                }
+                button.checkbox {
+                    align-items: center;
+                    border: 0px;
+                    border-radius: 50%;
+                    background-color: rgba(var(--spice-rgb-shadow), 0.7);
+                    color: var(--spice-text);
+                    cursor: pointer;
+                    display: flex;
+                    margin-inline-start: 12px;
+                    padding: 8px;
+                }
+                button.checkbox.disabled {
+                    color: rgba(var(--spice-rgb-text), 0.3);
+                }
+                select {
+                    color: var(--spice-text);
+                    background: rgba(var(--spice-rgb-shadow), 0.7);
+                    border: 0;
+                    height: 32px;
+                }
+                ::-webkit-scrollbar {
+                    width: 8px;
+                }
+                .login-button {
+                    background-color: var(--spice-button);
+                    border-radius: 8px;
+                    border-style: none;
+                    box-sizing: border-box;
+                    color: var(--spice-text);
+                    cursor: pointer;
+                    display: inline-block;
+                    font-size: 14px;
+                    font-weight: 500;
+                    height: 40px;
+                    line-height: 20px;
+                    list-style: none;
+                    margin: 10px;
+                    outline: none;
+                    padding: 5px 10px;
+                    position: relative;
+                    text-align: center;
+                    text-decoration: none;
+                    vertical-align: baseline;
+                    touch-action: manipulation;
+                }`
+    );
+
+    let settingsContent = Spicetify.React.createElement(
+        'div',
+        null,
+        style,
+        Spicetify.React.createElement(checkBoxItem, {
+            name: 'Half star ratings',
+            field: 'halfStarRatings',
+            onclick: async () => {},
+        }),
+        Spicetify.React.createElement(dropDownItem, {
+            name: 'Auto-like/dislike threshold',
+            field: 'likeThreshold',
+            options: {
+                disabled: 'Disabled',
+                '3.0': '3.0',
+                '3.5': '3.5',
+                '4.0': '4.0',
+                '4.5': '4.5',
+                '5.0': '5.0',
+            },
+            onclick: async () => {},
+        })
+    );
+    Spicetify.PopupModal.display({
+        title: 'Star Ratings',
+        content: settingsContent,
+    });
 }
 
 (async function StarRatings() {
     while (!Spicetify.showNotification) {
-        await new Promise(resolve => setTimeout(resolve, 500))
+        await new Promise(resolve => setTimeout(resolve, 500));
     }
 
+    SETTINGS = await getSettings();
+    await saveSettings();
+
+    new Spicetify.Menu.Item('Star Ratings', false, displaySettings).register();
+
     let [playlists, ratedFolderUid, ratings] = await getRatings();
-	let [pageType, id] = [null, null];
-	let [items, other] = [null, null];
+    let [pageType, id] = [null, null];
+    let [items, other] = [null, null];
     let toTrackUri = {};
     let updateNowPlayingWidget = null;
     let updateTracklist = null;
 
-    const addStarsListeners = (starData, trackUri, doUpdateNowPlayingWidget, doUpdateTracklist) => {
+    const addStarsListeners = (starData, trackUri, doUpdateNowPlayingWidget, doUpdateTracklist, heart) => {
         let currentRating = ratings[trackUri] ? ratings[trackUri] : '0.0';
 
         const [stars, starElements] = starData;
@@ -357,6 +614,13 @@ function getMouseoverRating(star, i) {
             star.addEventListener('click', async function() {
                 const newRating = getMouseoverRating(star, i);
 
+                if (SETTINGS.likeThreshold !== 'disabled') {
+                    if (heart.ariaChecked !== 'true' && newRating >= parseFloat(SETTINGS.likeThreshold))
+                        heart.click();
+                    if (heart.ariaChecked === 'true' && newRating < parseFloat(SETTINGS.likeThreshold))
+                        heart.click();
+                }
+
                 if (currentRating === newRating) return;
 
                 const rating = ratings[trackUri];
@@ -373,17 +637,19 @@ function getMouseoverRating(star, i) {
                 }
 
                 const playlist = playlists[ratingString];
+                let playlistUri = null;
 
                 if (!playlist) {
                     if (!ratedFolderUid) {
                         await createFolder('Rated');
                         [playlists, ratedFolderUid] = await getRatedPlaylists();
                     }
-                    await createPlaylist(ratingString, ratedFolderUid);
+                    playlistUri = await createPlaylist(ratingString, ratedFolderUid);
+                    await makePlaylistPrivate(playlistUri);
                     [playlists, ratedFolderUid] = await getRatedPlaylists();
                 }
 
-                const playlistUri = playlists[ratingString].uri;
+                playlistUri = playlists[ratingString].uri;
                 const playlistId = playlistUriToId(playlistUri);
                 await addTrackToPlaylist(playlistId, trackUri);
                 showNotification((rating ? 'Moved' : 'Added') + ` to ${ratingString}`);
@@ -404,6 +670,7 @@ function getMouseoverRating(star, i) {
 
     updateTracklist = () => {
         const tracklist = document.querySelector('.main-trackList-indexable');
+        if (!tracklist) return;
         const tracks = tracklist.getElementsByClassName('main-trackList-trackListRow');
 
         for (const track of tracks) {
@@ -416,7 +683,7 @@ function getMouseoverRating(star, i) {
             const starData = createStars('stars', trackUri);
             const stars = starData[0];
             trackData.heart.after(stars);
-            addStarsListeners(starData, trackUri, true, false);
+            addStarsListeners(starData, trackUri, true, false, trackData.heart);
 
             // Add listeners for hovering over a track in the tracklist
             stars.style.visibility = ratings[trackUri] ? 'visible' : 'hidden';
@@ -438,11 +705,13 @@ function getMouseoverRating(star, i) {
 
         if (stars) stars.remove();
 
+        if (trackUri.startsWith('spotify:local')) return;
+
         const starData = createStars('stars-playing', trackUri);
         stars = starData[0];
-        const heart = nowPlayingWidget.querySelector('.control-button-heart');
+        const heart = await waitForElement('.main-nowPlayingWidget-nowPlaying .control-button-heart');
         heart.after(stars);
-        addStarsListeners(starData, trackUri, false, true);
+        addStarsListeners(starData, trackUri, false, true, heart);
     };
 
     const tracklistObserver = new MutationObserver(() => {
@@ -465,12 +734,14 @@ function getMouseoverRating(star, i) {
         // Build trackUri map
         toTrackUri = {};
         for (const item of items) {
+            // Should be a podcast, so skip it.
+            if (pageType !== 'ARTIST' && !item.album) continue;
             const albumName = pageType === 'ARTIST' ? '' : item.album.name;
             const key = item.name + albumName + item.artists.map(artist => artist.name).join(', ');
             toTrackUri[key] = item.link;
         }
 
-        const tracklist = await waitForElement('.main-trackList-indexable', 1000);
+        const tracklist = await waitForElement('.main-trackList-indexable');
 
         updateTracklist();
 
