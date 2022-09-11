@@ -8,6 +8,8 @@
 //
 
 let SETTINGS = null;
+const sixColumnGridCss = '[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] 1fr [last] minmax(120px,1fr)';
+const fiveColumnGridCss = '[index] 16px [first] 4fr [var1] 2fr [var2] 1fr [last] minmax(120px,1fr)';
 
 async function getLocalStorageData(key) {
     return Spicetify.LocalStorage.get(key);
@@ -251,8 +253,6 @@ function createStars(starsId, trackUri) {
     stars.style.whiteSpace = 'nowrap';
     stars.style.alignItems = 'center';
     stars.style.display = 'flex';
-    stars.style.marginLeft = '10px';
-    stars.style.marginRight = '10px';
 
     const starElements = [];
     for (let i = 0; i < 5; i++) {
@@ -612,7 +612,7 @@ function displaySettings() {
             });
 
             star.addEventListener('click', async function() {
-                const newRating = getMouseoverRating(star, i);
+                let newRating = getMouseoverRating(star, i);
 
                 if (SETTINGS.likeThreshold !== 'disabled') {
                     if (heart.ariaChecked !== 'true' && newRating >= parseFloat(SETTINGS.likeThreshold))
@@ -621,7 +621,10 @@ function displaySettings() {
                         heart.click();
                 }
 
-                if (currentRating === newRating) return;
+                const removeRating = currentRating === newRating && ratings[trackUri]
+                if (removeRating) {
+                    newRating = '0.0';
+                }
 
                 const rating = ratings[trackUri];
                 const ratingString = newRating.toString();
@@ -634,12 +637,15 @@ function displaySettings() {
                     const playlistUri = playlists[rating].uri;
                     const playlistId = playlistUriToId(playlistUri);
                     await deleteTrackFromPlaylist(playlistId, trackUri);
+                    if (removeRating) {
+                        showNotification(`Removed from ${rating}`);
+                    }
                 }
 
                 const playlist = playlists[ratingString];
                 let playlistUri = null;
 
-                if (!playlist) {
+                if (!playlist && !removeRating) {
                     if (!ratedFolderUid) {
                         await createFolder('Rated');
                         [playlists, ratedFolderUid] = await getRatedPlaylists();
@@ -649,11 +655,15 @@ function displaySettings() {
                     [playlists, ratedFolderUid] = await getRatedPlaylists();
                 }
 
-                playlistUri = playlists[ratingString].uri;
-                const playlistId = playlistUriToId(playlistUri);
-                await addTrackToPlaylist(playlistId, trackUri);
-                showNotification((rating ? 'Moved' : 'Added') + ` to ${ratingString}`);
-                ratings[trackUri] = ratingString;
+                if (!removeRating) {
+                    playlistUri = playlists[ratingString].uri;
+                    const playlistId = playlistUriToId(playlistUri);
+                    await addTrackToPlaylist(playlistId, trackUri);
+                    showNotification((rating ? 'Moved' : 'Added') + ` to ${ratingString}`);
+                    ratings[trackUri] = ratingString;
+                } else {
+                    delete ratings[trackUri];
+                }
 
                 if (doUpdateNowPlayingWidget && updateNowPlayingWidget) {
                     await updateNowPlayingWidget();
@@ -674,15 +684,49 @@ function displaySettings() {
         const tracks = tracklist.getElementsByClassName('main-trackList-trackListRow');
 
         for (const track of tracks) {
+
             const trackData = getTrackData(track, pageType, other);
             const key = trackData.name + trackData.album + trackData.artists;
             const trackUri = toTrackUri[key];
 
-            if (!trackData.heart || trackData.hasStars || !trackUri) continue;
+            let ratingColumn = track.querySelector('.starRatings');
+            if (!ratingColumn) {
+                // Add column for stars
+                const lastColumn = track.querySelector('.main-trackList-rowSectionEnd');
+                const colIndexInt = parseInt(lastColumn.getAttribute('aria-colindex'));
+                lastColumn.setAttribute('aria-colindex', (colIndexInt + 1).toString());
+                ratingColumn = document.createElement('div');
+                ratingColumn.setAttribute('aria-colindex', colIndexInt.toString());
+                ratingColumn.role = 'gridcell';
+                ratingColumn.style.display = 'flex';
+                ratingColumn.classList.add('main-trackList-rowSectionVariable');
+                ratingColumn.classList.add('starRatings');
+                track.insertBefore(ratingColumn, lastColumn);
+
+                switch (pageType) {
+                    case 'ARTIST':
+                        track.style['grid-template-columns'] = fiveColumnGridCss;
+                        break;
+                    case 'ARTIST_LIKED':
+                        track.style['grid-template-columns'] = sixColumnGridCss;
+                        break;
+                    case 'ALBUM':
+                        track.style['grid-template-columns'] = fiveColumnGridCss;
+                        break;
+                    case 'PLAYLIST':
+                        track.style['grid-template-columns'] = sixColumnGridCss;
+                        break;
+                    case 'LIKED_SONGS':
+                        track.style['grid-template-columns'] = sixColumnGridCss;
+                        break;
+                };
+            }
+
+            if (!trackData.heart || !trackUri || trackData.hasStars) continue;
 
             const starData = createStars('stars', trackUri);
             const stars = starData[0];
-            trackData.heart.after(stars);
+            ratingColumn.appendChild(stars);
             addStarsListeners(starData, trackUri, true, false, trackData.heart);
 
             // Add listeners for hovering over a track in the tracklist
@@ -709,6 +753,8 @@ function displaySettings() {
 
         const starData = createStars('stars-playing', trackUri);
         stars = starData[0];
+        stars.style.marginLeft = '10px';
+        stars.style.marginRight = '10px';
         const heart = await waitForElement('.main-nowPlayingWidget-nowPlaying .control-button-heart');
         heart.after(stars);
         addStarsListeners(starData, trackUri, false, true, heart);
@@ -742,6 +788,24 @@ function displaySettings() {
         }
 
         const tracklist = await waitForElement('.main-trackList-indexable');
+
+        if (pageType !== 'ARTIST') {
+            const tracklistHeader = document.querySelector('.main-trackList-trackListHeaderRow');
+            switch (pageType) {
+                case 'ARTIST_LIKED':
+                    tracklistHeader.style['grid-template-columns'] = sixColumnGridCss;
+                    break;
+                case 'ALBUM':
+                    tracklistHeader.style['grid-template-columns'] = fiveColumnGridCss;
+                    break;
+                case 'PLAYLIST':
+                    tracklistHeader.style['grid-template-columns'] = sixColumnGridCss;
+                    break;
+                case 'LIKED_SONGS':
+                    tracklistHeader.style['grid-template-columns'] = sixColumnGridCss;
+                    break;
+            }
+        }
 
         updateTracklist();
 
