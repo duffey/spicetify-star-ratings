@@ -1,15 +1,16 @@
 // @ts-check
 // NAME: Star Ratings
 // AUTHOR: Scott Duffey
-// VERSION: 1.2.1
+// VERSION: 1.2.2
 // DESCRIPTION: Rate songs with stars and automatically save them to playlists
 
 /// <reference path='../globals.d.ts' />
 //
 
 let SETTINGS = null;
-const sixColumnGridCss = '[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] 1fr [last] minmax(120px,1fr)';
 const fiveColumnGridCss = '[index] 16px [first] 4fr [var1] 2fr [var2] 1fr [last] minmax(120px,1fr)';
+const sixColumnGridCss = '[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] 1fr [last] minmax(120px,1fr)';
+const sevenColumnGridCss = '[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var3] 1fr [last] minmax(120px,1fr)';
 
 async function getLocalStorageData(key) {
     return Spicetify.LocalStorage.get(key);
@@ -703,21 +704,17 @@ function displaySettings() {
                 ratingColumn.classList.add('starRatings');
                 track.insertBefore(ratingColumn, lastColumn);
 
-                switch (pageType) {
-                    case 'ARTIST':
+                switch (colIndexInt) {
+                    case 4:
                         track.style['grid-template-columns'] = fiveColumnGridCss;
                         break;
-                    case 'ARTIST_LIKED':
+                    case 5:
                         track.style['grid-template-columns'] = sixColumnGridCss;
                         break;
-                    case 'ALBUM':
-                        track.style['grid-template-columns'] = fiveColumnGridCss;
+                    case 6:
+                        track.style['grid-template-columns'] = sevenColumnGridCss;
                         break;
-                    case 'PLAYLIST':
-                        track.style['grid-template-columns'] = sixColumnGridCss;
-                        break;
-                    case 'LIKED_SONGS':
-                        track.style['grid-template-columns'] = sixColumnGridCss;
+                    default:
                         break;
                 };
             }
@@ -791,20 +788,21 @@ function displaySettings() {
 
         if (pageType !== 'ARTIST') {
             const tracklistHeader = document.querySelector('.main-trackList-trackListHeaderRow');
-            switch (pageType) {
-                case 'ARTIST_LIKED':
-                    tracklistHeader.style['grid-template-columns'] = sixColumnGridCss;
-                    break;
-                case 'ALBUM':
+            const lastColumn = tracklistHeader.querySelector('.main-trackList-rowSectionEnd');
+            const colIndexInt = parseInt(lastColumn.getAttribute('aria-colindex'));
+            switch (colIndexInt) {
+                case 4:
                     tracklistHeader.style['grid-template-columns'] = fiveColumnGridCss;
                     break;
-                case 'PLAYLIST':
+                case 5:
                     tracklistHeader.style['grid-template-columns'] = sixColumnGridCss;
                     break;
-                case 'LIKED_SONGS':
-                    tracklistHeader.style['grid-template-columns'] = sixColumnGridCss;
+                case 6:
+                    tracklistHeader.style['grid-template-columns'] = sevenColumnGridCss;
                     break;
-            }
+                default:
+                    break;
+            };
         }
 
         updateTracklist();
