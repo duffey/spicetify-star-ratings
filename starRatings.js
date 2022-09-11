@@ -1,7 +1,7 @@
 // @ts-check
 // NAME: Star Ratings
 // AUTHOR: Scott Duffey
-// VERSION: 1.1
+// VERSION: 1.2.1
 // DESCRIPTION: Rate songs with stars and automatically save them to playlists
 
 /// <reference path='../globals.d.ts' />
