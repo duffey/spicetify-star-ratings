@@ -684,6 +684,27 @@ function displaySettings() {
         if (!tracklist) return;
         const tracks = tracklist.getElementsByClassName('main-trackList-trackListRow');
 
+        const tracklistHeader = document.querySelector('.main-trackList-trackListHeaderRow');
+        // No tracklist header on Artist page
+        if (tracklistHeader) {
+            let lastColumn = tracklistHeader.querySelector('.main-trackList-rowSectionEnd');
+            let colIndexInt = parseInt(lastColumn.getAttribute('aria-colindex'));
+
+            switch (colIndexInt) {
+                case 4:
+                    tracklistHeader.style['grid-template-columns'] = fiveColumnGridCss;
+                    break;
+                case 5:
+                    tracklistHeader.style['grid-template-columns'] = sixColumnGridCss;
+                    break;
+                case 6:
+                    tracklistHeader.style['grid-template-columns'] = sevenColumnGridCss;
+                    break;
+                default:
+                    break;
+            };
+        }
+
         for (const track of tracks) {
 
             const trackData = getTrackData(track, pageType, other);
@@ -693,8 +714,8 @@ function displaySettings() {
             let ratingColumn = track.querySelector('.starRatings');
             if (!ratingColumn) {
                 // Add column for stars
-                const lastColumn = track.querySelector('.main-trackList-rowSectionEnd');
-                const colIndexInt = parseInt(lastColumn.getAttribute('aria-colindex'));
+                lastColumn = track.querySelector('.main-trackList-rowSectionEnd');
+                colIndexInt = parseInt(lastColumn.getAttribute('aria-colindex'));
                 lastColumn.setAttribute('aria-colindex', (colIndexInt + 1).toString());
                 ratingColumn = document.createElement('div');
                 ratingColumn.setAttribute('aria-colindex', colIndexInt.toString());
@@ -785,25 +806,6 @@ function displaySettings() {
         }
 
         const tracklist = await waitForElement('.main-trackList-indexable');
-
-        if (pageType !== 'ARTIST') {
-            const tracklistHeader = document.querySelector('.main-trackList-trackListHeaderRow');
-            const lastColumn = tracklistHeader.querySelector('.main-trackList-rowSectionEnd');
-            const colIndexInt = parseInt(lastColumn.getAttribute('aria-colindex'));
-            switch (colIndexInt) {
-                case 4:
-                    tracklistHeader.style['grid-template-columns'] = fiveColumnGridCss;
-                    break;
-                case 5:
-                    tracklistHeader.style['grid-template-columns'] = sixColumnGridCss;
-                    break;
-                case 6:
-                    tracklistHeader.style['grid-template-columns'] = sevenColumnGridCss;
-                    break;
-                default:
-                    break;
-            };
-        }
 
         updateTracklist();
 
