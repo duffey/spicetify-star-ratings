@@ -1,7 +1,7 @@
 // @ts-check
 // NAME: Star Ratings
 // AUTHOR: Scott Duffey
-// VERSION: 1.3
+// VERSION: 1.4
 // DESCRIPTION: Rate songs with stars and automatically save them to playlists
 
 /// <reference path='../globals.d.ts' />
@@ -31,7 +31,8 @@ async function getSettings() {
         await setLocalStorageData('starRatings:settings', `{}`);
         return {
             halfStarRatings: true,
-            likeThreshold: '4.0'
+            likeThreshold: '4.0',
+            hideHearts: false
         };
     }
 }
@@ -452,6 +453,16 @@ function displaySettings() {
             field: 'halfStarRatings',
             onclick: async () => {},
         }),
+        Spicetify.React.createElement(checkBoxItem, {
+            name: 'Hide hearts',
+            field: 'hideHearts',
+            onclick: async () => {
+                document.querySelector('.control-button-heart').style.display = SETTINGS.hideHearts ? 'none' : 'flex';
+                const hearts = document.querySelectorAll('.main-trackList-rowHeartButton');
+                for (const heart of hearts)
+                    heart.style.display = SETTINGS.hideHearts ? 'none' : 'flex';
+            },
+        }),
         Spicetify.React.createElement(dropDownItem, {
             name: 'Auto-like/dislike threshold',
             field: 'likeThreshold',
@@ -712,6 +723,7 @@ function getPageType() {
             const currentRating = ratings[trackUri] ? ratings[trackUri] : '0.0';
             ratingColumn.appendChild(stars);
             setRating(starElements, currentRating);
+            getHeart().style.display = SETTINGS.hideHearts ? 'none' : 'flex';
             addStarsListeners(starData, () => { return trackUri; }, true, false, getHeart);
 
             // Add listeners for hovering over a track in the tracklist
@@ -777,6 +789,7 @@ function getPageType() {
             trackInfo.after(nowPlayingWidgetStarData[0]);
             const getTrackUri = () => { return Spicetify.Player.data.track.uri; };
             const getHeart = () => { return document.querySelector('.main-nowPlayingWidget-nowPlaying .control-button-heart'); };
+            getHeart().style.display = SETTINGS.hideHearts ? 'none' : 'flex';
             addStarsListeners(nowPlayingWidgetStarData, getTrackUri, false, true, getHeart);
 
             updateNowPlayingWidget();
