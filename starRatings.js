@@ -1,7 +1,7 @@
 // @ts-check
 // NAME: Star Ratings
 // AUTHOR: Scott Duffey
-// VERSION: 1.4
+// VERSION: 1.4.1
 // DESCRIPTION: Rate songs with stars and automatically save them to playlists
 
 /// <reference path='../globals.d.ts' />
@@ -457,7 +457,9 @@ function displaySettings() {
             name: 'Hide hearts',
             field: 'hideHearts',
             onclick: async () => {
-                document.querySelector('.control-button-heart').style.display = SETTINGS.hideHearts ? 'none' : 'flex';
+                const nowPlayingWidgetHeart = document.querySelector('.control-button-heart');
+                if (nowPlayingWidgetHeart)
+                    nowPlayingWidgetHeart.style.display = SETTINGS.hideHearts ? 'none' : 'flex';
                 const hearts = document.querySelectorAll('.main-trackList-rowHeartButton');
                 for (const heart of hearts)
                     heart.style.display = SETTINGS.hideHearts ? 'none' : 'flex';
@@ -779,19 +781,21 @@ function getPageType() {
             });
         }
 
+        const getHeart = () => { return document.querySelector('.main-nowPlayingWidget-nowPlaying .control-button-heart'); };
+        if (getHeart())
+            getHeart().style.display = SETTINGS.hideHearts ? 'none' : 'flex';
+
         oldNowPlayingWidget = nowPlayingWidget;
         nowPlayingWidget = document.querySelector('.main-nowPlayingWidget-nowPlaying');
         if (nowPlayingWidget && !nowPlayingWidget.isEqualNode(oldNowPlayingWidget)) {
+            console.log('widget changed');
             nowPlayingWidgetStarData = createStars('now-playing', 16);
             nowPlayingWidgetStarData[0].style.marginLeft = '8px';
             nowPlayingWidgetStarData[0].style.marginRight = '8px';
             const trackInfo = await waitForElement('.main-nowPlayingWidget-nowPlaying .main-trackInfo-container');
             trackInfo.after(nowPlayingWidgetStarData[0]);
             const getTrackUri = () => { return Spicetify.Player.data.track.uri; };
-            const getHeart = () => { return document.querySelector('.main-nowPlayingWidget-nowPlaying .control-button-heart'); };
-            getHeart().style.display = SETTINGS.hideHearts ? 'none' : 'flex';
             addStarsListeners(nowPlayingWidgetStarData, getTrackUri, false, true, getHeart);
-
             updateNowPlayingWidget();
         }
     }
