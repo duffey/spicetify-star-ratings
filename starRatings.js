@@ -1,7 +1,7 @@
 // @ts-check
 // NAME: Star Ratings
 // AUTHOR: Scott Duffey
-// VERSION: 1.4.1
+// VERSION: 1.5
 // DESCRIPTION: Rate songs with stars and automatically save them to playlists
 
 /// <reference path='../globals.d.ts' />
@@ -9,7 +9,7 @@
 
 let SETTINGS = null;
 const fiveColumnGridCss = '[index] 16px [first] 4fr [var1] 2fr [var2] 1fr [last] minmax(120px,1fr)';
-const sixColumnGridCss = '[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] 1fr [last] minmax(120px,1fr)';
+const sixColumnGridCss = '[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] 2fr [last] minmax(120px,1fr)';
 const sevenColumnGridCss = '[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var3] 1fr [last] minmax(120px,1fr)';
 
 async function getLocalStorageData(key) {
@@ -32,7 +32,8 @@ async function getSettings() {
         return {
             halfStarRatings: true,
             likeThreshold: '4.0',
-            hideHearts: false
+            hideHearts: false,
+            enableKeyboardShortcuts: true
         };
     }
 }
@@ -363,126 +364,23 @@ function dropDownItem({
     );
 }
 
-function displaySettings() {
-    const style = Spicetify.React.createElement(
-        'style',
-        null,
-        `.popup-row::after {
-                    content: "";
-                    display: table;
-                    clear: both;
-                }
-                .popup-row .col {
-                    display: flex;
-                    padding: 10px 0;
-                    align-items: center;
-                }
-                .popup-row .col.description {
-                    float: left;
-                    padding-right: 15px;
-                }
-                .popup-row .col.action {
-                    float: right;
-                    text-align: right;
-                }
-                .popup-row .div-title {
-                    color: var(--spice-text);
-                }
-                .popup-row .divider {
-                    height: 2px;
-                    border-width: 0;
-                    background-color: var(--spice-button-disabled);
-                }
-                .popup-row .space {
-                    margin-bottom: 20px;
-                    visibility: hidden;
-                }
-                button.checkbox {
-                    align-items: center;
-                    border: 0px;
-                    border-radius: 50%;
-                    background-color: rgba(var(--spice-rgb-shadow), 0.7);
-                    color: var(--spice-text);
-                    cursor: pointer;
-                    display: flex;
-                    margin-inline-start: 12px;
-                    padding: 8px;
-                }
-                button.checkbox.disabled {
-                    color: rgba(var(--spice-rgb-text), 0.3);
-                }
-                select {
-                    color: var(--spice-text);
-                    background: rgba(var(--spice-rgb-shadow), 0.7);
-                    border: 0;
-                    height: 32px;
-                }
-                ::-webkit-scrollbar {
-                    width: 8px;
-                }
-                .login-button {
-                    background-color: var(--spice-button);
-                    border-radius: 8px;
-                    border-style: none;
-                    box-sizing: border-box;
-                    color: var(--spice-text);
-                    cursor: pointer;
-                    display: inline-block;
-                    font-size: 14px;
-                    font-weight: 500;
-                    height: 40px;
-                    line-height: 20px;
-                    list-style: none;
-                    margin: 10px;
-                    outline: none;
-                    padding: 5px 10px;
-                    position: relative;
-                    text-align: center;
-                    text-decoration: none;
-                    vertical-align: baseline;
-                    touch-action: manipulation;
-                }`
-    );
-
-    let settingsContent = Spicetify.React.createElement(
-        'div',
-        null,
-        style,
-        Spicetify.React.createElement(checkBoxItem, {
-            name: 'Half star ratings',
-            field: 'halfStarRatings',
-            onclick: async () => {},
-        }),
-        Spicetify.React.createElement(checkBoxItem, {
-            name: 'Hide hearts',
-            field: 'hideHearts',
-            onclick: async () => {
-                const nowPlayingWidgetHeart = document.querySelector('.control-button-heart');
-                if (nowPlayingWidgetHeart)
-                    nowPlayingWidgetHeart.style.display = SETTINGS.hideHearts ? 'none' : 'flex';
-                const hearts = document.querySelectorAll('.main-trackList-rowHeartButton');
-                for (const heart of hearts)
-                    heart.style.display = SETTINGS.hideHearts ? 'none' : 'flex';
-            },
-        }),
-        Spicetify.React.createElement(dropDownItem, {
-            name: 'Auto-like/dislike threshold',
-            field: 'likeThreshold',
-            options: {
-                disabled: 'Disabled',
-                '3.0': '3.0',
-                '3.5': '3.5',
-                '4.0': '4.0',
-                '4.5': '4.5',
-                '5.0': '5.0',
-            },
-            onclick: async () => {},
-        })
-    );
-    Spicetify.PopupModal.display({
-        title: 'Star Ratings',
-        content: settingsContent,
-    });
+function keyboardShortcutDescription(label, numberKey) {
+    return Spicetify.React.createElement('li', {
+        className: 'main-keyboardShortcutsHelpModal-sectionItem'
+    },
+        Spicetify.React.createElement('span', {
+            className: 'Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-sectionItemName'
+        }, label),
+        Spicetify.React.createElement('kbd', {
+            className: 'Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-key'
+        }, 'Ctrl'),
+        Spicetify.React.createElement('kbd', {
+            className: 'Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-key'
+        }, 'Alt'),
+        Spicetify.React.createElement('kbd', {
+            className: 'Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-key'
+        }, numberKey)
+    )
 }
 
 function getPageType() {
@@ -514,8 +412,6 @@ function getPageType() {
     SETTINGS = await getSettings();
     await saveSettings();
 
-    new Spicetify.Menu.Item('Star Ratings', false, displaySettings).register();
-
     let oldTracklist = null;
     let tracklist = null;
 
@@ -528,6 +424,10 @@ function getPageType() {
     let updateTracklist = null;
     let albumStarData = null;
     let nowPlayingWidgetStarData = null;
+
+    const getNowPlayingHeart = () => { return document.querySelector('.main-nowPlayingWidget-nowPlaying .control-button-heart'); };
+
+    const getNowPlayingTrackUri = () => { return Spicetify.Player.data.track.uri; };
 
     const updateAlbumRating = async () => {
         if (pageType !== 'ALBUM') return;
@@ -563,6 +463,268 @@ function getPageType() {
         setRating(albumStarData[1], averageRating.toString());
     }
 
+    function getClickListener(i, ratingOverride, starData, getTrackUri, doUpdateNowPlayingWidget, doUpdateTracklist, getHeart) {
+        const getCurrentRating = (trackUri) => {
+            return ratings[trackUri] ? ratings[trackUri] : '0.0';
+        }
+
+        const [stars, starElements] = starData;
+        const star = starElements[i][0];
+
+        return async () => {
+            const trackUri = getTrackUri();
+            const currentRating = getCurrentRating(trackUri);
+            let newRating = (ratingOverride !== null) ? ratingOverride : getMouseoverRating(star, i);
+
+            const heart = getHeart();
+            if (heart && SETTINGS.likeThreshold !== 'disabled') {
+                if (heart.ariaChecked !== 'true' && newRating >= parseFloat(SETTINGS.likeThreshold))
+                    heart.click();
+                if (heart.ariaChecked === 'true' && newRating < parseFloat(SETTINGS.likeThreshold))
+                    heart.click();
+            }
+
+            const removeRating = currentRating === newRating && ratings[trackUri]
+            if (removeRating) {
+                newRating = '0.0';
+            }
+
+            const rating = ratings[trackUri];
+            const ratingString = newRating.toString();
+            // Do this first because otherwise the track mouseout event will set the track row to hidden again
+            ratings[trackUri] = ratingString;
+
+            setRating(starElements, newRating);
+
+            if (rating) {
+                const playlistUri = playlists[rating].uri;
+                const playlistId = playlistUriToId(playlistUri);
+                await deleteTrackFromPlaylist(playlistId, trackUri);
+                if (removeRating) {
+                    showNotification(`Removed from ${rating}`);
+                }
+            }
+
+            const playlist = playlists[ratingString];
+            let playlistUri = null;
+
+            if (!playlist && !removeRating) {
+                if (!ratedFolderUid) {
+                    await createFolder('Rated');
+                    [playlists, ratedFolderUid] = await getRatedPlaylists();
+                }
+                playlistUri = await createPlaylist(ratingString, ratedFolderUid);
+                await makePlaylistPrivate(playlistUri);
+                [playlists, ratedFolderUid] = await getRatedPlaylists();
+            }
+
+            if (!removeRating) {
+                playlistUri = playlists[ratingString].uri;
+                const playlistId = playlistUriToId(playlistUri);
+                await addTrackToPlaylist(playlistId, trackUri);
+                showNotification((rating ? 'Moved' : 'Added') + ` to ${ratingString}`);
+                ratings[trackUri] = ratingString;
+            } else {
+                delete ratings[trackUri];
+            }
+
+            if (doUpdateNowPlayingWidget && updateNowPlayingWidget) {
+                updateNowPlayingWidget();
+            }
+
+            if (doUpdateTracklist && updateTracklist) {
+                const nowPlayingStars = document.getElementById(`stars-${trackUri}`);
+                if (nowPlayingStars)
+                    nowPlayingStars.remove();
+                await updateTracklist();
+            }
+
+            await updateAlbumRating();
+
+        };
+    }
+
+    const registerKeyboardShortcuts = () => {
+        Spicetify.Keyboard.registerShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_0, ctrl: true, alt: true }, getClickListener(4, '5.0', nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart));
+        Spicetify.Keyboard.registerShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_1, ctrl: true, alt: true }, getClickListener(0, '0.5', nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart));
+        Spicetify.Keyboard.registerShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_2, ctrl: true, alt: true }, getClickListener(0, '1.0', nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart));
+        Spicetify.Keyboard.registerShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_3, ctrl: true, alt: true }, getClickListener(1, '1.5', nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart));
+        Spicetify.Keyboard.registerShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_4, ctrl: true, alt: true }, getClickListener(1, '2.0', nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart));
+        Spicetify.Keyboard.registerShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_5, ctrl: true, alt: true }, getClickListener(2, '2.5', nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart));
+        Spicetify.Keyboard.registerShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_6, ctrl: true, alt: true }, getClickListener(2, '3.0', nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart));
+        Spicetify.Keyboard.registerShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_7, ctrl: true, alt: true }, getClickListener(3, '3.5', nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart));
+        Spicetify.Keyboard.registerShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_8, ctrl: true, alt: true }, getClickListener(3, '4.0', nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart));
+        Spicetify.Keyboard.registerShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_9, ctrl: true, alt: true }, getClickListener(4, '4.5', nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart));
+    }
+
+    const deregisterKeyboardShortcuts = () => {
+        Spicetify.Keyboard._deregisterShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_0, ctrl: true, alt: true });
+        Spicetify.Keyboard._deregisterShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_1, ctrl: true, alt: true });
+        Spicetify.Keyboard._deregisterShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_2, ctrl: true, alt: true });
+        Spicetify.Keyboard._deregisterShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_3, ctrl: true, alt: true });
+        Spicetify.Keyboard._deregisterShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_4, ctrl: true, alt: true });
+        Spicetify.Keyboard._deregisterShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_5, ctrl: true, alt: true });
+        Spicetify.Keyboard._deregisterShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_6, ctrl: true, alt: true });
+        Spicetify.Keyboard._deregisterShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_7, ctrl: true, alt: true });
+        Spicetify.Keyboard._deregisterShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_8, ctrl: true, alt: true });
+        Spicetify.Keyboard._deregisterShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_9, ctrl: true, alt: true });
+    }
+
+    function displaySettings() {
+        const style = Spicetify.React.createElement(
+            'style',
+            null,
+            `.popup-row::after {
+                        content: "";
+                        display: table;
+                        clear: both;
+                    }
+                    .popup-row .col {
+                        display: flex;
+                        padding: 10px 0;
+                        align-items: center;
+                    }
+                    .popup-row .col.description {
+                        float: left;
+                        padding-right: 15px;
+                    }
+                    .popup-row .col.action {
+                        float: right;
+                        text-align: right;
+                    }
+                    .popup-row .div-title {
+                        color: var(--spice-text);
+                    }
+                    .popup-row .divider {
+                        height: 2px;
+                        border-width: 0;
+                        background-color: var(--spice-button-disabled);
+                    }
+                    .popup-row .space {
+                        margin-bottom: 20px;
+                        visibility: hidden;
+                    }
+                    button.checkbox {
+                        align-items: center;
+                        border: 0px;
+                        border-radius: 50%;
+                        background-color: rgba(var(--spice-rgb-shadow), 0.7);
+                        color: var(--spice-text);
+                        cursor: pointer;
+                        display: flex;
+                        margin-inline-start: 12px;
+                        padding: 8px;
+                    }
+                    button.checkbox.disabled {
+                        color: rgba(var(--spice-rgb-text), 0.3);
+                    }
+                    select {
+                        color: var(--spice-text);
+                        background: rgba(var(--spice-rgb-shadow), 0.7);
+                        border: 0;
+                        height: 32px;
+                    }
+                    ::-webkit-scrollbar {
+                        width: 8px;
+                    }
+                    .login-button {
+                        background-color: var(--spice-button);
+                        border-radius: 8px;
+                        border-style: none;
+                        box-sizing: border-box;
+                        color: var(--spice-text);
+                        cursor: pointer;
+                        display: inline-block;
+                        font-size: 14px;
+                        font-weight: 500;
+                        height: 40px;
+                        line-height: 20px;
+                        list-style: none;
+                        margin: 10px;
+                        outline: none;
+                        padding: 5px 10px;
+                        position: relative;
+                        text-align: center;
+                        text-decoration: none;
+                        vertical-align: baseline;
+                        touch-action: manipulation;
+                    }`
+        );
+
+        let settingsContent = Spicetify.React.createElement(
+            'div',
+            null,
+            style,
+            Spicetify.React.createElement('h2', {
+                className: 'Type__TypeElement-goli3j-0 bcTfIx main-keyboardShortcutsHelpModal-sectionHeading'
+            }, 'Settings'),
+            Spicetify.React.createElement(checkBoxItem, {
+                name: 'Half star ratings',
+                field: 'halfStarRatings',
+                onclick: async () => {},
+            }),
+            Spicetify.React.createElement(checkBoxItem, {
+                name: 'Hide hearts',
+                field: 'hideHearts',
+                onclick: async () => {
+                    const nowPlayingWidgetHeart = document.querySelector('.control-button-heart');
+                    if (nowPlayingWidgetHeart)
+                        nowPlayingWidgetHeart.style.display = SETTINGS.hideHearts ? 'none' : 'flex';
+                    const hearts = document.querySelectorAll('.main-trackList-rowHeartButton');
+                    for (const heart of hearts)
+                        heart.style.display = SETTINGS.hideHearts ? 'none' : 'flex';
+                },
+            }),
+            Spicetify.React.createElement(checkBoxItem, {
+                name: 'Enable keyboard shortcuts',
+                field: 'enableKeyboardShortcuts',
+                onclick: async () => {
+                    if (SETTINGS.enableKeyboardShortcuts) {
+                        registerKeyboardShortcuts();
+                    } else {
+                        deregisterKeyboardShortcuts();
+                    }
+                }
+            }),
+            Spicetify.React.createElement(dropDownItem, {
+                name: 'Auto-like/dislike threshold',
+                field: 'likeThreshold',
+                options: {
+                    disabled: 'Disabled',
+                    '3.0': '3.0',
+                    '3.5': '3.5',
+                    '4.0': '4.0',
+                    '4.5': '4.5',
+                    '5.0': '5.0',
+                },
+                onclick: async () => {},
+            }),
+            Spicetify.React.createElement('h2', {
+                className: 'Type__TypeElement-goli3j-0 bcTfIx main-keyboardShortcutsHelpModal-sectionHeading'
+            }, 'Keyboard Shortcuts'),
+            Spicetify.React.createElement('ul', null,
+                keyboardShortcutDescription('Rate current track 0.5 stars', '1'),
+                keyboardShortcutDescription('Rate current track 1 star', '2'),
+                keyboardShortcutDescription('Rate current track 1.5 stars', '3'),
+                keyboardShortcutDescription('Rate current track 2 stars', '4'),
+                keyboardShortcutDescription('Rate current track 2.5 stars', '5'),
+                keyboardShortcutDescription('Rate current track 3 stars', '6'),
+                keyboardShortcutDescription('Rate current track 3.5 stars', '7'),
+                keyboardShortcutDescription('Rate current track 4 stars', '8'),
+                keyboardShortcutDescription('Rate current track 4.5 stars', '9'),
+                keyboardShortcutDescription('Rate current track 5 stars', '0')
+            )
+        );
+        Spicetify.PopupModal.display({
+            title: 'Star Ratings',
+            content: settingsContent,
+            isLarge: true
+        });
+    }
+
+    new Spicetify.Menu.Item('Star Ratings', false, displaySettings).register();
+
+
     const addStarsListeners = (starData, getTrackUri, doUpdateNowPlayingWidget, doUpdateTracklist, getHeart) => {
         const getCurrentRating = (trackUri) => {
             return ratings[trackUri] ? ratings[trackUri] : '0.0';
@@ -582,76 +744,7 @@ function getPageType() {
                 setRating(starElements, rating);
             });
 
-            star.addEventListener('click', async function() {
-                const trackUri = getTrackUri();
-                const currentRating = getCurrentRating(trackUri);
-                let newRating = getMouseoverRating(star, i);
-
-                const heart = getHeart();
-                if (heart && SETTINGS.likeThreshold !== 'disabled') {
-                    if (heart.ariaChecked !== 'true' && newRating >= parseFloat(SETTINGS.likeThreshold))
-                        heart.click();
-                    if (heart.ariaChecked === 'true' && newRating < parseFloat(SETTINGS.likeThreshold))
-                        heart.click();
-                }
-
-                const removeRating = currentRating === newRating && ratings[trackUri]
-                if (removeRating) {
-                    newRating = '0.0';
-                }
-
-                const rating = ratings[trackUri];
-                const ratingString = newRating.toString();
-                // Do this first because otherwise the track mouseout event will set the track row to hidden again
-                ratings[trackUri] = ratingString;
-
-                setRating(starElements, newRating);
-
-                if (rating) {
-                    const playlistUri = playlists[rating].uri;
-                    const playlistId = playlistUriToId(playlistUri);
-                    await deleteTrackFromPlaylist(playlistId, trackUri);
-                    if (removeRating) {
-                        showNotification(`Removed from ${rating}`);
-                    }
-                }
-
-                const playlist = playlists[ratingString];
-                let playlistUri = null;
-
-                if (!playlist && !removeRating) {
-                    if (!ratedFolderUid) {
-                        await createFolder('Rated');
-                        [playlists, ratedFolderUid] = await getRatedPlaylists();
-                    }
-                    playlistUri = await createPlaylist(ratingString, ratedFolderUid);
-                    await makePlaylistPrivate(playlistUri);
-                    [playlists, ratedFolderUid] = await getRatedPlaylists();
-                }
-
-                if (!removeRating) {
-                    playlistUri = playlists[ratingString].uri;
-                    const playlistId = playlistUriToId(playlistUri);
-                    await addTrackToPlaylist(playlistId, trackUri);
-                    showNotification((rating ? 'Moved' : 'Added') + ` to ${ratingString}`);
-                    ratings[trackUri] = ratingString;
-                } else {
-                    delete ratings[trackUri];
-                }
-
-                if (doUpdateNowPlayingWidget && updateNowPlayingWidget) {
-                    updateNowPlayingWidget();
-                }
-
-                if (doUpdateTracklist && updateTracklist) {
-                    const nowPlayingStars = document.getElementById(`stars-${trackUri}`);
-                    if (nowPlayingStars)
-                        nowPlayingStars.remove();
-                    await updateTracklist();
-                }
-
-                await updateAlbumRating();
-            });
+            star.addEventListener('click', getClickListener(i, null, starData, getTrackUri, doUpdateNowPlayingWidget, doUpdateTracklist, getHeart));
         }
     }
 
@@ -781,22 +874,22 @@ function getPageType() {
             });
         }
 
-        const getHeart = () => { return document.querySelector('.main-nowPlayingWidget-nowPlaying .control-button-heart'); };
-        if (getHeart())
-            getHeart().style.display = SETTINGS.hideHearts ? 'none' : 'flex';
+        if (getNowPlayingHeart())
+            getNowPlayingHeart().style.display = SETTINGS.hideHearts ? 'none' : 'flex';
 
         oldNowPlayingWidget = nowPlayingWidget;
         nowPlayingWidget = document.querySelector('.main-nowPlayingWidget-nowPlaying');
         if (nowPlayingWidget && !nowPlayingWidget.isEqualNode(oldNowPlayingWidget)) {
-            console.log('widget changed');
             nowPlayingWidgetStarData = createStars('now-playing', 16);
             nowPlayingWidgetStarData[0].style.marginLeft = '8px';
             nowPlayingWidgetStarData[0].style.marginRight = '8px';
             const trackInfo = await waitForElement('.main-nowPlayingWidget-nowPlaying .main-trackInfo-container');
             trackInfo.after(nowPlayingWidgetStarData[0]);
-            const getTrackUri = () => { return Spicetify.Player.data.track.uri; };
-            addStarsListeners(nowPlayingWidgetStarData, getTrackUri, false, true, getHeart);
+            addStarsListeners(nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart);
             updateNowPlayingWidget();
+            if (SETTINGS.enableKeyboardShortcuts) {
+                registerKeyboardShortcuts();
+            }
         }
     }
     const observer = new MutationObserver(observerCallback);
