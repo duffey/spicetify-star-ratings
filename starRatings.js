@@ -1,7 +1,7 @@
 // @ts-check
 // NAME: Star Ratings
 // AUTHOR: Scott Duffey
-// VERSION: 1.5
+// VERSION: 1.6
 // DESCRIPTION: Rate songs with stars and automatically save them to playlists
 
 /// <reference path='../globals.d.ts' />
@@ -10,7 +10,7 @@
 let SETTINGS = null;
 const fiveColumnGridCss = '[index] 16px [first] 4fr [var1] 2fr [var2] 1fr [last] minmax(120px,1fr)';
 const sixColumnGridCss = '[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] 2fr [last] minmax(120px,1fr)';
-const sevenColumnGridCss = '[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var3] 1fr [last] minmax(120px,1fr)';
+const sevenColumnGridCss = '[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var3] 2fr [last] minmax(120px,1fr)';
 
 async function getLocalStorageData(key) {
     return Spicetify.LocalStorage.get(key);
@@ -33,7 +33,8 @@ async function getSettings() {
             halfStarRatings: true,
             likeThreshold: '4.0',
             hideHearts: false,
-            enableKeyboardShortcuts: true
+            enableKeyboardShortcuts: true,
+            showPlaylistStars: true
         };
     }
 }
@@ -686,6 +687,11 @@ function getPageType() {
                     }
                 }
             }),
+            Spicetify.React.createElement(checkBoxItem, {
+                name: 'Show playlist stars',
+                field: 'showPlaylistStars',
+                onclick: async () => {},
+            }),
             Spicetify.React.createElement(dropDownItem, {
                 name: 'Auto-like/dislike threshold',
                 field: 'likeThreshold',
@@ -749,6 +755,7 @@ function getPageType() {
     }
 
     updateTracklist = () => {
+        if (!SETTINGS.showPlaylistStars) return;
         const tracklist_ = document.querySelector('.main-trackList-indexable');
         if (!tracklist_) return;
         const tracks = tracklist_.getElementsByClassName('main-trackList-trackListRow');
