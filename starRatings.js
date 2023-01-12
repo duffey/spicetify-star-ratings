@@ -1,7 +1,7 @@
 // @ts-check
 // NAME: Star Ratings
 // AUTHOR: Scott Duffey
-// VERSION: 1.6
+// VERSION: 1.6.1
 // DESCRIPTION: Rate songs with stars and automatically save them to playlists
 
 /// <reference path='../globals.d.ts' />
@@ -45,7 +45,8 @@ async function saveSettings() {
 
 const RATINGS = ['0.0', '0.5', '1.0', '1.5', '2.0', '2.5', '3.0', '3.5', '4.0', '4.5', '5.0'];
 
-const waitForElement = (selector) => {
+// The name "waitForElement" breaks the Dribbblish theme
+const _waitForElement = (selector) => {
     return new Promise((resolve) => {
         if (document.querySelector(selector)) {
             return resolve(document.querySelector(selector));
@@ -453,7 +454,7 @@ function getPageType() {
         // Round to nearest 0.5
         averageRating = (Math.round(averageRating * 2) / 2).toFixed(1);
 
-        const actionBar = await waitForElement('.main-actionBar-ActionBar');
+        const actionBar = await _waitForElement('.main-actionBar-ActionBar');
         const hasStars = actionBar.querySelector('.stars');
         const playButton = actionBar.querySelector('.main-playButton-PlayButton');
 
@@ -890,7 +891,7 @@ function getPageType() {
             nowPlayingWidgetStarData = createStars('now-playing', 16);
             nowPlayingWidgetStarData[0].style.marginLeft = '8px';
             nowPlayingWidgetStarData[0].style.marginRight = '8px';
-            const trackInfo = await waitForElement('.main-nowPlayingWidget-nowPlaying .main-trackInfo-container');
+            const trackInfo = await _waitForElement('.main-nowPlayingWidget-nowPlaying .main-trackInfo-container');
             trackInfo.after(nowPlayingWidgetStarData[0]);
             addStarsListeners(nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart);
             updateNowPlayingWidget();
