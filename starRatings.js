@@ -5,432 +5,430 @@
 // DESCRIPTION: Rate songs with stars and automatically save them to playlists
 
 /// <reference path='../globals.d.ts' />
-//
-
-let SETTINGS = null
-const fiveColumnGridCss = "[index] 16px [first] 4fr [var1] 2fr [var2] 1fr [last] minmax(120px,1fr)"
-const sixColumnGridCss = "[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] 2fr [last] minmax(120px,1fr)"
-const sevenColumnGridCss = "[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var3] 2fr [last] minmax(120px,1fr)"
-
-async function getLocalStorageData(key) {
-    return Spicetify.LocalStorage.get(key)
-}
-
-async function setLocalStorageData(key, value) {
-    Spicetify.LocalStorage.set(key, value)
-}
-
-async function getSettings() {
-    try {
-        const parsed = JSON.parse(await getLocalStorageData("starRatings:settings"))
-        if (parsed && typeof parsed === "object") {
-            return parsed
-        }
-        throw ""
-    } catch {
-        await setLocalStorageData("starRatings:settings", `{}`)
-        return {
-            halfStarRatings: true,
-            likeThreshold: "4.0",
-            hideHearts: false,
-            enableKeyboardShortcuts: true,
-            showPlaylistStars: true,
-        }
-    }
-}
-
-async function saveSettings() {
-    await setLocalStorageData("starRatings:settings", JSON.stringify(SETTINGS))
-}
-
-const RATINGS = ["0.0", "0.5", "1.0", "1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"]
-
-// The name "waitForElement" breaks the Dribbblish theme
-const _waitForElement = (selector) => {
-    return new Promise((resolve) => {
-        if (document.querySelector(selector)) {
-            return resolve(document.querySelector(selector))
-        }
-        const observer = new MutationObserver(() => {
-            if (document.querySelector(selector)) {
-                observer.disconnect()
-                resolve(document.querySelector(selector))
-            }
-        })
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true,
-        })
-    })
-}
-
-async function showNotification(text) {
-    Spicetify.showNotification(text)
-}
-
-async function createPlaylist(name, folderUid) {
-    return await Spicetify.Platform.RootlistAPI.createPlaylist(name, {
-        after: folderUid,
-    })
-}
-
-async function makePlaylistPrivate(playlistUri) {
-    try {
-        await Spicetify.CosmosAsync.post(`sp://core-playlist/v1/playlist/${playlistUri}/set-base-permission`, {
-            permission_level: "BLOCKED",
-        })
-    } catch (error) {
-        await new Promise((resolve) => setTimeout(resolve, 500))
-        await Spicetify.CosmosAsync.post(`sp://core-playlist/v1/playlist/${playlistUri}/set-base-permission`, {
-            permission_level: "BLOCKED",
-        })
-    }
-}
-
-async function createFolder(name) {
-    await Spicetify.Platform.RootlistAPI.createFolder(name)
-}
-
-async function getAlbum(albumId) {
-    return await Spicetify.CosmosAsync.get(`wg://album/v1/album-app/album/${albumId}/desktop`)
-}
-
-async function getPlaylists() {
-    return await Spicetify.Platform.RootlistAPI.getContents()
-}
-
-async function addTrackToPlaylist(playlistId, trackUri) {
-    try {
-        await Spicetify.CosmosAsync.post(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
-            uris: [trackUri],
-        })
-    } catch (error) {
-        await new Promise((resolve) => setTimeout(resolve, 500))
-        await Spicetify.CosmosAsync.post(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
-            uris: [trackUri],
-        })
-    }
-}
-
-async function deleteTrackFromPlaylist(playlistId, trackUri) {
-    await Spicetify.CosmosAsync.del(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
-        tracks: [
-            {
-                uri: trackUri,
-            },
-        ],
-    })
-}
-
-async function getPlaylistItems(uri) {
-    const result = await Spicetify.CosmosAsync.get(`sp://core-playlist/v1/playlist/${uri}`)
-    return result.items
-}
-
-function filterRatedPlaylists(playlists) {
-    const result = {}
-    for (const playlist of playlists.items) {
-        if (!RATINGS.includes(playlist.name)) continue
-        result[playlist.name] = playlist
-    }
-    return result
-}
-
-async function getRatedPlaylists() {
-    let playlists = await getPlaylists()
-    const rated = playlists.items.find((playlist) => playlist.type === "folder" && playlist.name === "Rated")
-    if (!rated) {
-        return [[], null]
-    }
-    playlists = rated
-    return [filterRatedPlaylists(playlists), rated.uid]
-}
-
-async function getRatings() {
-    const [playlists, ratedFolder] = await getRatedPlaylists()
-    const ratings = {}
-    for (const rating in playlists) {
-        const items = await getPlaylistItems(playlists[rating].uri)
-        for (const item of items) {
-            const uri = item.link
-            if (!ratings[uri]) {
-                ratings[uri] = rating
-            } else {
-                const m = parseFloat(rating)
-                const n = parseFloat(ratings[uri])
-                const lower = m < n ? rating : ratings[uri]
-                const higher = m > n ? rating : ratings[uri]
-                ratings[uri] = higher
-                console.log(`Removing track ${item.name} with lower rating ${lower} and higher rating ${higher} from lower rated playlist ${playlists[lower].name}.`)
-                await deleteTrackFromPlaylist(playlistUriToId(playlists[lower].uri), uri)
-            }
-        }
-    }
-    return [playlists, ratedFolder, ratings]
-}
-
-function playlistUriToId(uri) {
-    return uri.match(/spotify:playlist:(.*)/)[1]
-}
-
-function createStar(starsId, n, size) {
-    const xmlns = "http://www.w3.org/2000/svg"
-    const star = document.createElementNS(xmlns, "svg")
-    const id = `${starsId}-${n}`
-    star.id = id
-    star.style.minHeight = `${size}px`
-    star.style.minWidth = `${size}px`
-    star.setAttributeNS(null, "width", `${size}px`)
-    star.setAttributeNS(null, "height", `${size}px`)
-    star.setAttributeNS(null, "viewBox", `0 0 32 32`)
-
-    const defs = document.createElementNS(xmlns, "defs")
-    star.append(defs)
-
-    const gradient = document.createElementNS(xmlns, "linearGradient")
-    defs.append(gradient)
-    gradient.id = `${id}-gradient`
-
-    const stopFirst = document.createElementNS(xmlns, "stop")
-    gradient.append(stopFirst)
-    stopFirst.id = `${id}-gradient-first`
-    stopFirst.setAttributeNS(null, "offset", "50%")
-    stopFirst.setAttributeNS(null, "stop-color", "var(--spice-button-disabled)")
-
-    const stopSecond = document.createElementNS(xmlns, "stop")
-    gradient.append(stopSecond)
-    stopSecond.id = `${id}-gradient-second`
-    stopSecond.setAttributeNS(null, "offset", "50%")
-    stopSecond.setAttributeNS(null, "stop-color", "var(--spice-button-disabled)")
-
-    const path = document.createElementNS(xmlns, "path")
-    star.append(path)
-    path.setAttributeNS(null, "fill", `url(#${gradient.id})`)
-    path.setAttributeNS(null, "d", "M20.388,10.918L32,12.118l-8.735,7.749L25.914,31.4l-9.893-6.088L6.127,31.4l2.695-11.533L0,12.118l11.547-1.2L16.026,0.6L20.388,10.918z")
-
-    return [star, stopFirst, stopSecond]
-}
-
-function createStars(idSuffix, size) {
-    const stars = document.createElement("span")
-    const id = `stars-${idSuffix}`
-    stars.className = "stars"
-    stars.id = id
-    stars.style.whiteSpace = "nowrap"
-    stars.style.alignItems = "center"
-    stars.style.display = "flex"
-
-    const starElements = []
-    for (let i = 0; i < 5; i++) {
-        const [star, stopFirst, stopSecond] = createStar(id, i + 1, size)
-        stars.append(star)
-        starElements.push([star, stopFirst, stopSecond])
-    }
-
-    return [stars, starElements]
-}
-
-function getTracklistTrackUri(tracklistElement) {
-    let values = Object.values(tracklistElement)
-    if (!values) return null
-
-    return (
-        values[0]?.pendingProps?.children[0]?.props?.children?.props?.uri ||
-        values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.uri ||
-        values[0]?.pendingProps?.children[0]?.props?.children[0]?.props?.uri
-    )
-}
-
-function setRating(starElements, rating) {
-    const halfStars = (rating /= 0.5)
-    for (let i = 0; i < 5; i++) {
-        const stopFirst = starElements[i][1]
-        const stopSecond = starElements[i][2]
-        stopFirst.setAttributeNS(null, "stop-color", "var(--spice-button-disabled)")
-        stopSecond.setAttributeNS(null, "stop-color", "var(--spice-button-disabled)")
-    }
-    for (let i = 0; i < halfStars; i++) {
-        const j = Math.floor(i / 2)
-        const stopFirst = starElements[j][1]
-        const stopSecond = starElements[j][2]
-        if (i % 2 === 0) {
-            stopFirst.setAttributeNS(null, "stop-color", "var(--spice-button)")
-        } else {
-            stopSecond.setAttributeNS(null, "stop-color", "var(--spice-button)")
-        }
-    }
-}
-
-function getMouseoverRating(star, i) {
-    const rect = star.getBoundingClientRect()
-    const offset = event.clientX - rect.left
-    const half = offset > 8 || !SETTINGS.halfStarRatings
-    const zeroStars = i === 0 && offset < 3
-    let rating = i + 1
-    if (!half) rating -= 0.5
-    if (zeroStars) {
-        rating -= SETTINGS.halfStarRatings ? 0.5 : 1.0
-    }
-    return rating.toFixed(1)
-}
-
-function displayIcon({ icon, size }) {
-    return Spicetify.React.createElement("svg", {
-        width: size,
-        height: size,
-        viewBox: "0 0 16 16",
-        fill: "currentColor",
-        dangerouslySetInnerHTML: {
-            __html: icon,
-        },
-    })
-}
-
-function checkBoxItem({ name, field, onclick }) {
-    let [value, setValue] = Spicetify.React.useState(SETTINGS[field])
-    return Spicetify.React.createElement(
-        "div",
-        {
-            className: "popup-row",
-        },
-        Spicetify.React.createElement(
-            "label",
-            {
-                className: "col description",
-            },
-            name
-        ),
-        Spicetify.React.createElement(
-            "div",
-            {
-                className: "col action",
-            },
-            Spicetify.React.createElement(
-                "button",
-                {
-                    className: "checkbox" + (value ? "" : " disabled"),
-                    onClick: async () => {
-                        let state = !value
-                        SETTINGS[field] = state
-                        setValue(state)
-                        await saveSettings()
-                        onclick()
-                    },
-                },
-                Spicetify.React.createElement(displayIcon, {
-                    icon: Spicetify.SVGIcons.check,
-                    size: 16,
-                })
-            )
-        )
-    )
-}
-
-function dropDownItem({ name, field, options, onclick }) {
-    const [value, setValue] = Spicetify.React.useState(SETTINGS[field])
-    return Spicetify.React.createElement(
-        "div",
-        {
-            className: "popup-row",
-        },
-        Spicetify.React.createElement(
-            "label",
-            {
-                className: "col description",
-            },
-            name
-        ),
-        Spicetify.React.createElement(
-            "div",
-            {
-                className: "col action",
-            },
-            Spicetify.React.createElement(
-                "select",
-                {
-                    value,
-                    onChange: async (e) => {
-                        setValue(e.target.value)
-                        SETTINGS[field] = e.target.value
-                        await saveSettings()
-                        onclick()
-                    },
-                },
-                Object.keys(options).map((item) =>
-                    Spicetify.React.createElement(
-                        "option",
-                        {
-                            value: item,
-                        },
-                        options[item]
-                    )
-                )
-            )
-        )
-    )
-}
-
-function keyboardShortcutDescription(label, numberKey) {
-    return Spicetify.React.createElement(
-        "li",
-        {
-            className: "main-keyboardShortcutsHelpModal-sectionItem",
-        },
-        Spicetify.React.createElement(
-            "span",
-            {
-                className: "Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-sectionItemName",
-            },
-            label
-        ),
-        Spicetify.React.createElement(
-            "kbd",
-            {
-                className: "Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-key",
-            },
-            "Ctrl"
-        ),
-        Spicetify.React.createElement(
-            "kbd",
-            {
-                className: "Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-key",
-            },
-            "Alt"
-        ),
-        Spicetify.React.createElement(
-            "kbd",
-            {
-                className: "Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-key",
-            },
-            numberKey
-        )
-    )
-}
-
-function getPageType() {
-    const pathname = Spicetify.Platform.History.location.pathname
-    let matches = null
-    if (pathname === "/collection/tracks") {
-        return ["LIKED_SONGS", null]
-    }
-    if ((matches = pathname.match(/playlist\/(.*)/))) {
-        return ["PLAYLIST", matches[1]]
-    }
-    if ((matches = pathname.match(/album\/(.*)/))) {
-        return ["ALBUM", matches[1]]
-    }
-    if ((matches = pathname.match(/artist\/([^/]*)$/))) {
-        return ["ARTIST", matches[1]]
-    }
-    if ((matches = pathname.match(/artist\/([^/]*)\/saved/))) {
-        return ["ARTIST_LIKED", matches[1]]
-    }
-    return ["OTHER", null]
-}
 
 ;(async function StarRatings() {
     while (!Spicetify.showNotification) {
         await new Promise((resolve) => setTimeout(resolve, 500))
+    }
+
+    let SETTINGS = null
+    const fiveColumnGridCss = "[index] 16px [first] 4fr [var1] 2fr [var2] 1fr [last] minmax(120px,1fr)"
+    const sixColumnGridCss = "[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] 2fr [last] minmax(120px,1fr)"
+    const sevenColumnGridCss = "[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var3] 2fr [last] minmax(120px,1fr)"
+
+    async function getLocalStorageData(key) {
+        return Spicetify.LocalStorage.get(key)
+    }
+
+    async function setLocalStorageData(key, value) {
+        Spicetify.LocalStorage.set(key, value)
+    }
+
+    async function getSettings() {
+        try {
+            const parsed = JSON.parse(await getLocalStorageData("starRatings:settings"))
+            if (parsed && typeof parsed === "object") {
+                return parsed
+            }
+            throw ""
+        } catch {
+            await setLocalStorageData("starRatings:settings", `{}`)
+            return {
+                halfStarRatings: true,
+                likeThreshold: "4.0",
+                hideHearts: false,
+                enableKeyboardShortcuts: true,
+                showPlaylistStars: true,
+            }
+        }
+    }
+
+    async function saveSettings() {
+        await setLocalStorageData("starRatings:settings", JSON.stringify(SETTINGS))
+    }
+
+    const RATINGS = ["0.0", "0.5", "1.0", "1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"]
+
+    const waitForElement = (selector) => {
+        return new Promise((resolve) => {
+            if (document.querySelector(selector)) {
+                return resolve(document.querySelector(selector))
+            }
+            const observer = new MutationObserver(() => {
+                if (document.querySelector(selector)) {
+                    observer.disconnect()
+                    resolve(document.querySelector(selector))
+                }
+            })
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+            })
+        })
+    }
+
+    async function showNotification(text) {
+        Spicetify.showNotification(text)
+    }
+
+    async function createPlaylist(name, folderUid) {
+        return await Spicetify.Platform.RootlistAPI.createPlaylist(name, {
+            after: folderUid,
+        })
+    }
+
+    async function makePlaylistPrivate(playlistUri) {
+        try {
+            await Spicetify.CosmosAsync.post(`sp://core-playlist/v1/playlist/${playlistUri}/set-base-permission`, {
+                permission_level: "BLOCKED",
+            })
+        } catch (error) {
+            await new Promise((resolve) => setTimeout(resolve, 500))
+            await Spicetify.CosmosAsync.post(`sp://core-playlist/v1/playlist/${playlistUri}/set-base-permission`, {
+                permission_level: "BLOCKED",
+            })
+        }
+    }
+
+    async function createFolder(name) {
+        await Spicetify.Platform.RootlistAPI.createFolder(name)
+    }
+
+    async function getAlbum(albumId) {
+        return await Spicetify.CosmosAsync.get(`wg://album/v1/album-app/album/${albumId}/desktop`)
+    }
+
+    async function getPlaylists() {
+        return await Spicetify.Platform.RootlistAPI.getContents()
+    }
+
+    async function addTrackToPlaylist(playlistId, trackUri) {
+        try {
+            await Spicetify.CosmosAsync.post(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+                uris: [trackUri],
+            })
+        } catch (error) {
+            await new Promise((resolve) => setTimeout(resolve, 500))
+            await Spicetify.CosmosAsync.post(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+                uris: [trackUri],
+            })
+        }
+    }
+
+    async function deleteTrackFromPlaylist(playlistId, trackUri) {
+        await Spicetify.CosmosAsync.del(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+            tracks: [
+                {
+                    uri: trackUri,
+                },
+            ],
+        })
+    }
+
+    async function getPlaylistItems(uri) {
+        const result = await Spicetify.CosmosAsync.get(`sp://core-playlist/v1/playlist/${uri}`)
+        return result.items
+    }
+
+    function filterRatedPlaylists(playlists) {
+        const result = {}
+        for (const playlist of playlists.items) {
+            if (!RATINGS.includes(playlist.name)) continue
+            result[playlist.name] = playlist
+        }
+        return result
+    }
+
+    async function getRatedPlaylists() {
+        let playlists = await getPlaylists()
+        const rated = playlists.items.find((playlist) => playlist.type === "folder" && playlist.name === "Rated")
+        if (!rated) {
+            return [[], null]
+        }
+        playlists = rated
+        return [filterRatedPlaylists(playlists), rated.uid]
+    }
+
+    async function getRatings() {
+        const [playlists, ratedFolder] = await getRatedPlaylists()
+        const ratings = {}
+        for (const rating in playlists) {
+            const items = await getPlaylistItems(playlists[rating].uri)
+            for (const item of items) {
+                const uri = item.link
+                if (!ratings[uri]) {
+                    ratings[uri] = rating
+                } else {
+                    const m = parseFloat(rating)
+                    const n = parseFloat(ratings[uri])
+                    const lower = m < n ? rating : ratings[uri]
+                    const higher = m > n ? rating : ratings[uri]
+                    ratings[uri] = higher
+                    console.log(`Removing track ${item.name} with lower rating ${lower} and higher rating ${higher} from lower rated playlist ${playlists[lower].name}.`)
+                    await deleteTrackFromPlaylist(playlistUriToId(playlists[lower].uri), uri)
+                }
+            }
+        }
+        return [playlists, ratedFolder, ratings]
+    }
+
+    function playlistUriToId(uri) {
+        return uri.match(/spotify:playlist:(.*)/)[1]
+    }
+
+    function createStar(starsId, n, size) {
+        const xmlns = "http://www.w3.org/2000/svg"
+        const star = document.createElementNS(xmlns, "svg")
+        const id = `${starsId}-${n}`
+        star.id = id
+        star.style.minHeight = `${size}px`
+        star.style.minWidth = `${size}px`
+        star.setAttributeNS(null, "width", `${size}px`)
+        star.setAttributeNS(null, "height", `${size}px`)
+        star.setAttributeNS(null, "viewBox", `0 0 32 32`)
+
+        const defs = document.createElementNS(xmlns, "defs")
+        star.append(defs)
+
+        const gradient = document.createElementNS(xmlns, "linearGradient")
+        defs.append(gradient)
+        gradient.id = `${id}-gradient`
+
+        const stopFirst = document.createElementNS(xmlns, "stop")
+        gradient.append(stopFirst)
+        stopFirst.id = `${id}-gradient-first`
+        stopFirst.setAttributeNS(null, "offset", "50%")
+        stopFirst.setAttributeNS(null, "stop-color", "var(--spice-button-disabled)")
+
+        const stopSecond = document.createElementNS(xmlns, "stop")
+        gradient.append(stopSecond)
+        stopSecond.id = `${id}-gradient-second`
+        stopSecond.setAttributeNS(null, "offset", "50%")
+        stopSecond.setAttributeNS(null, "stop-color", "var(--spice-button-disabled)")
+
+        const path = document.createElementNS(xmlns, "path")
+        star.append(path)
+        path.setAttributeNS(null, "fill", `url(#${gradient.id})`)
+        path.setAttributeNS(null, "d", "M20.388,10.918L32,12.118l-8.735,7.749L25.914,31.4l-9.893-6.088L6.127,31.4l2.695-11.533L0,12.118l11.547-1.2L16.026,0.6L20.388,10.918z")
+
+        return [star, stopFirst, stopSecond]
+    }
+
+    function createStars(idSuffix, size) {
+        const stars = document.createElement("span")
+        const id = `stars-${idSuffix}`
+        stars.className = "stars"
+        stars.id = id
+        stars.style.whiteSpace = "nowrap"
+        stars.style.alignItems = "center"
+        stars.style.display = "flex"
+
+        const starElements = []
+        for (let i = 0; i < 5; i++) {
+            const [star, stopFirst, stopSecond] = createStar(id, i + 1, size)
+            stars.append(star)
+            starElements.push([star, stopFirst, stopSecond])
+        }
+
+        return [stars, starElements]
+    }
+
+    function getTracklistTrackUri(tracklistElement) {
+        let values = Object.values(tracklistElement)
+        if (!values) return null
+
+        return (
+            values[0]?.pendingProps?.children[0]?.props?.children?.props?.uri ||
+            values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.uri ||
+            values[0]?.pendingProps?.children[0]?.props?.children[0]?.props?.uri
+        )
+    }
+
+    function setRating(starElements, rating) {
+        const halfStars = (rating /= 0.5)
+        for (let i = 0; i < 5; i++) {
+            const stopFirst = starElements[i][1]
+            const stopSecond = starElements[i][2]
+            stopFirst.setAttributeNS(null, "stop-color", "var(--spice-button-disabled)")
+            stopSecond.setAttributeNS(null, "stop-color", "var(--spice-button-disabled)")
+        }
+        for (let i = 0; i < halfStars; i++) {
+            const j = Math.floor(i / 2)
+            const stopFirst = starElements[j][1]
+            const stopSecond = starElements[j][2]
+            if (i % 2 === 0) {
+                stopFirst.setAttributeNS(null, "stop-color", "var(--spice-button)")
+            } else {
+                stopSecond.setAttributeNS(null, "stop-color", "var(--spice-button)")
+            }
+        }
+    }
+
+    function getMouseoverRating(star, i) {
+        const rect = star.getBoundingClientRect()
+        const offset = event.clientX - rect.left
+        const half = offset > 8 || !SETTINGS.halfStarRatings
+        const zeroStars = i === 0 && offset < 3
+        let rating = i + 1
+        if (!half) rating -= 0.5
+        if (zeroStars) {
+            rating -= SETTINGS.halfStarRatings ? 0.5 : 1.0
+        }
+        return rating.toFixed(1)
+    }
+
+    function displayIcon({ icon, size }) {
+        return Spicetify.React.createElement("svg", {
+            width: size,
+            height: size,
+            viewBox: "0 0 16 16",
+            fill: "currentColor",
+            dangerouslySetInnerHTML: {
+                __html: icon,
+            },
+        })
+    }
+
+    function checkBoxItem({ name, field, onclick }) {
+        let [value, setValue] = Spicetify.React.useState(SETTINGS[field])
+        return Spicetify.React.createElement(
+            "div",
+            {
+                className: "popup-row",
+            },
+            Spicetify.React.createElement(
+                "label",
+                {
+                    className: "col description",
+                },
+                name
+            ),
+            Spicetify.React.createElement(
+                "div",
+                {
+                    className: "col action",
+                },
+                Spicetify.React.createElement(
+                    "button",
+                    {
+                        className: "checkbox" + (value ? "" : " disabled"),
+                        onClick: async () => {
+                            let state = !value
+                            SETTINGS[field] = state
+                            setValue(state)
+                            await saveSettings()
+                            onclick()
+                        },
+                    },
+                    Spicetify.React.createElement(displayIcon, {
+                        icon: Spicetify.SVGIcons.check,
+                        size: 16,
+                    })
+                )
+            )
+        )
+    }
+
+    function dropDownItem({ name, field, options, onclick }) {
+        const [value, setValue] = Spicetify.React.useState(SETTINGS[field])
+        return Spicetify.React.createElement(
+            "div",
+            {
+                className: "popup-row",
+            },
+            Spicetify.React.createElement(
+                "label",
+                {
+                    className: "col description",
+                },
+                name
+            ),
+            Spicetify.React.createElement(
+                "div",
+                {
+                    className: "col action",
+                },
+                Spicetify.React.createElement(
+                    "select",
+                    {
+                        value,
+                        onChange: async (e) => {
+                            setValue(e.target.value)
+                            SETTINGS[field] = e.target.value
+                            await saveSettings()
+                            onclick()
+                        },
+                    },
+                    Object.keys(options).map((item) =>
+                        Spicetify.React.createElement(
+                            "option",
+                            {
+                                value: item,
+                            },
+                            options[item]
+                        )
+                    )
+                )
+            )
+        )
+    }
+
+    function keyboardShortcutDescription(label, numberKey) {
+        return Spicetify.React.createElement(
+            "li",
+            {
+                className: "main-keyboardShortcutsHelpModal-sectionItem",
+            },
+            Spicetify.React.createElement(
+                "span",
+                {
+                    className: "Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-sectionItemName",
+                },
+                label
+            ),
+            Spicetify.React.createElement(
+                "kbd",
+                {
+                    className: "Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-key",
+                },
+                "Ctrl"
+            ),
+            Spicetify.React.createElement(
+                "kbd",
+                {
+                    className: "Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-key",
+                },
+                "Alt"
+            ),
+            Spicetify.React.createElement(
+                "kbd",
+                {
+                    className: "Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-key",
+                },
+                numberKey
+            )
+        )
+    }
+
+    function getPageType() {
+        const pathname = Spicetify.Platform.History.location.pathname
+        let matches = null
+        if (pathname === "/collection/tracks") {
+            return ["LIKED_SONGS", null]
+        }
+        if ((matches = pathname.match(/playlist\/(.*)/))) {
+            return ["PLAYLIST", matches[1]]
+        }
+        if ((matches = pathname.match(/album\/(.*)/))) {
+            return ["ALBUM", matches[1]]
+        }
+        if ((matches = pathname.match(/artist\/([^/]*)$/))) {
+            return ["ARTIST", matches[1]]
+        }
+        if ((matches = pathname.match(/artist\/([^/]*)\/saved/))) {
+            return ["ARTIST_LIKED", matches[1]]
+        }
+        return ["OTHER", null]
     }
 
     SETTINGS = await getSettings()
@@ -478,7 +476,7 @@ function getPageType() {
         // Round to nearest 0.5
         averageRating = (Math.round(averageRating * 2) / 2).toFixed(1)
 
-        const actionBar = await _waitForElement(".main-actionBar-ActionBar")
+        const actionBar = await waitForElement(".main-actionBar-ActionBar")
         const hasStars = actionBar.querySelector(".stars")
         const playButton = actionBar.querySelector(".main-playButton-PlayButton")
 
@@ -1037,7 +1035,7 @@ function getPageType() {
             nowPlayingWidgetStarData = createStars("now-playing", 16)
             nowPlayingWidgetStarData[0].style.marginLeft = "8px"
             nowPlayingWidgetStarData[0].style.marginRight = "8px"
-            const trackInfo = await _waitForElement(".main-nowPlayingWidget-nowPlaying .main-trackInfo-container")
+            const trackInfo = await waitForElement(".main-nowPlayingWidget-nowPlaying .main-trackInfo-container")
             trackInfo.after(nowPlayingWidgetStarData[0])
             addStarsListeners(nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
             updateNowPlayingWidget()
