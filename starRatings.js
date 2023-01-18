@@ -7,355 +7,359 @@
 /// <reference path='../globals.d.ts' />
 //
 
-let SETTINGS = null;
-const fiveColumnGridCss = '[index] 16px [first] 4fr [var1] 2fr [var2] 1fr [last] minmax(120px,1fr)';
-const sixColumnGridCss = '[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] 2fr [last] minmax(120px,1fr)';
-const sevenColumnGridCss = '[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var3] 2fr [last] minmax(120px,1fr)';
+let SETTINGS = null
+const fiveColumnGridCss = "[index] 16px [first] 4fr [var1] 2fr [var2] 1fr [last] minmax(120px,1fr)"
+const sixColumnGridCss = "[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] 2fr [last] minmax(120px,1fr)"
+const sevenColumnGridCss = "[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var3] 2fr [last] minmax(120px,1fr)"
 
 async function getLocalStorageData(key) {
-    return Spicetify.LocalStorage.get(key);
+    return Spicetify.LocalStorage.get(key)
 }
 
 async function setLocalStorageData(key, value) {
-    Spicetify.LocalStorage.set(key, value);
+    Spicetify.LocalStorage.set(key, value)
 }
 
 async function getSettings() {
     try {
-        const parsed = JSON.parse(await getLocalStorageData('starRatings:settings'));
-        if (parsed && typeof parsed === 'object') {
-            return parsed;
+        const parsed = JSON.parse(await getLocalStorageData("starRatings:settings"))
+        if (parsed && typeof parsed === "object") {
+            return parsed
         }
-        throw '';
+        throw ""
     } catch {
-        await setLocalStorageData('starRatings:settings', `{}`);
+        await setLocalStorageData("starRatings:settings", `{}`)
         return {
             halfStarRatings: true,
-            likeThreshold: '4.0',
+            likeThreshold: "4.0",
             hideHearts: false,
             enableKeyboardShortcuts: true,
-            showPlaylistStars: true
-        };
+            showPlaylistStars: true,
+        }
     }
 }
 
 async function saveSettings() {
-    await setLocalStorageData('starRatings:settings', JSON.stringify(SETTINGS));
+    await setLocalStorageData("starRatings:settings", JSON.stringify(SETTINGS))
 }
 
-const RATINGS = ['0.0', '0.5', '1.0', '1.5', '2.0', '2.5', '3.0', '3.5', '4.0', '4.5', '5.0'];
+const RATINGS = ["0.0", "0.5", "1.0", "1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"]
 
 // The name "waitForElement" breaks the Dribbblish theme
 const _waitForElement = (selector) => {
     return new Promise((resolve) => {
         if (document.querySelector(selector)) {
-            return resolve(document.querySelector(selector));
+            return resolve(document.querySelector(selector))
         }
         const observer = new MutationObserver(() => {
             if (document.querySelector(selector)) {
-                observer.disconnect();
-                resolve(document.querySelector(selector));
+                observer.disconnect()
+                resolve(document.querySelector(selector))
             }
-        });
+        })
         observer.observe(document.body, {
             childList: true,
-            subtree: true
-        });
-    });
+            subtree: true,
+        })
+    })
 }
 
 async function showNotification(text) {
-    Spicetify.showNotification(text);
+    Spicetify.showNotification(text)
 }
 
 async function createPlaylist(name, folderUid) {
     return await Spicetify.Platform.RootlistAPI.createPlaylist(name, {
-        after: folderUid
-    });
+        after: folderUid,
+    })
 }
 
 async function makePlaylistPrivate(playlistUri) {
     try {
         await Spicetify.CosmosAsync.post(`sp://core-playlist/v1/playlist/${playlistUri}/set-base-permission`, {
-            permission_level: 'BLOCKED'
-        });
+            permission_level: "BLOCKED",
+        })
     } catch (error) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 500))
         await Spicetify.CosmosAsync.post(`sp://core-playlist/v1/playlist/${playlistUri}/set-base-permission`, {
-            permission_level: 'BLOCKED'
-        });
+            permission_level: "BLOCKED",
+        })
     }
 }
 
 async function createFolder(name) {
-    await Spicetify.Platform.RootlistAPI.createFolder(name);
+    await Spicetify.Platform.RootlistAPI.createFolder(name)
 }
 
 async function getAlbum(albumId) {
-    return await Spicetify.CosmosAsync.get(`wg://album/v1/album-app/album/${albumId}/desktop`);
+    return await Spicetify.CosmosAsync.get(`wg://album/v1/album-app/album/${albumId}/desktop`)
 }
 
 async function getPlaylists() {
-    return await Spicetify.Platform.RootlistAPI.getContents();
+    return await Spicetify.Platform.RootlistAPI.getContents()
 }
 
 async function addTrackToPlaylist(playlistId, trackUri) {
     try {
         await Spicetify.CosmosAsync.post(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
-            uris: [trackUri]
+            uris: [trackUri],
         })
     } catch (error) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 500))
         await Spicetify.CosmosAsync.post(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
-            uris: [trackUri]
+            uris: [trackUri],
         })
     }
 }
 
 async function deleteTrackFromPlaylist(playlistId, trackUri) {
     await Spicetify.CosmosAsync.del(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
-        tracks: [{
-            uri: trackUri
-        }]
+        tracks: [
+            {
+                uri: trackUri,
+            },
+        ],
     })
 }
 
 async function getPlaylistItems(uri) {
-    const result = await Spicetify.CosmosAsync.get(`sp://core-playlist/v1/playlist/${uri}`);
-    return result.items;
+    const result = await Spicetify.CosmosAsync.get(`sp://core-playlist/v1/playlist/${uri}`)
+    return result.items
 }
 
 function filterRatedPlaylists(playlists) {
     const result = {}
     for (const playlist of playlists.items) {
-        if (!RATINGS.includes(playlist.name)) continue;
-        result[playlist.name] = playlist;
+        if (!RATINGS.includes(playlist.name)) continue
+        result[playlist.name] = playlist
     }
-    return result;
+    return result
 }
 
 async function getRatedPlaylists() {
-    let playlists = await getPlaylists();
-    const rated = playlists.items.find(playlist => playlist.type === 'folder' && playlist.name === 'Rated');
+    let playlists = await getPlaylists()
+    const rated = playlists.items.find((playlist) => playlist.type === "folder" && playlist.name === "Rated")
     if (!rated) {
-        return [
-            [], null
-        ];
+        return [[], null]
     }
-    playlists = rated;
-    return [filterRatedPlaylists(playlists), rated.uid];
+    playlists = rated
+    return [filterRatedPlaylists(playlists), rated.uid]
 }
 
 async function getRatings() {
     const [playlists, ratedFolder] = await getRatedPlaylists()
-    const ratings = {};
+    const ratings = {}
     for (const rating in playlists) {
-        const items = await getPlaylistItems(playlists[rating].uri);
+        const items = await getPlaylistItems(playlists[rating].uri)
         for (const item of items) {
-            const uri = item.link;
+            const uri = item.link
             if (!ratings[uri]) {
-                ratings[uri] = rating;
+                ratings[uri] = rating
             } else {
-                const m = parseFloat(rating);
-                const n = parseFloat(ratings[uri]);
-                const lower = (m < n) ? rating : ratings[uri];
-                const higher = (m > n) ? rating : ratings[uri];
-                ratings[uri] = higher;
-                console.log(`Removing track ${item.name} with lower rating ${lower} and higher rating ${higher} from lower rated playlist ${playlists[lower].name}.`);
-                await deleteTrackFromPlaylist(playlistUriToId(playlists[lower].uri), uri);
+                const m = parseFloat(rating)
+                const n = parseFloat(ratings[uri])
+                const lower = m < n ? rating : ratings[uri]
+                const higher = m > n ? rating : ratings[uri]
+                ratings[uri] = higher
+                console.log(`Removing track ${item.name} with lower rating ${lower} and higher rating ${higher} from lower rated playlist ${playlists[lower].name}.`)
+                await deleteTrackFromPlaylist(playlistUriToId(playlists[lower].uri), uri)
             }
         }
     }
-    return [playlists, ratedFolder, ratings];
+    return [playlists, ratedFolder, ratings]
 }
 
 function playlistUriToId(uri) {
-    return uri.match(/spotify:playlist:(.*)/)[1];
+    return uri.match(/spotify:playlist:(.*)/)[1]
 }
 
 function createStar(starsId, n, size) {
-    const xmlns = 'http://www.w3.org/2000/svg';
-    const star = document.createElementNS(xmlns, 'svg');
-    const id = `${starsId}-${n}`;
-    star.id = id;
-    star.style.minHeight = `${size}px`;
-    star.style.minWidth = `${size}px`;
-    star.setAttributeNS(null, 'width', `${size}px`);
-    star.setAttributeNS(null, 'height', `${size}px`);
-    star.setAttributeNS(null, 'viewBox', `0 0 32 32`);
+    const xmlns = "http://www.w3.org/2000/svg"
+    const star = document.createElementNS(xmlns, "svg")
+    const id = `${starsId}-${n}`
+    star.id = id
+    star.style.minHeight = `${size}px`
+    star.style.minWidth = `${size}px`
+    star.setAttributeNS(null, "width", `${size}px`)
+    star.setAttributeNS(null, "height", `${size}px`)
+    star.setAttributeNS(null, "viewBox", `0 0 32 32`)
 
-    const defs = document.createElementNS(xmlns, 'defs');
-    star.append(defs);
+    const defs = document.createElementNS(xmlns, "defs")
+    star.append(defs)
 
-    const gradient = document.createElementNS(xmlns, 'linearGradient');
-    defs.append(gradient);
-    gradient.id = `${id}-gradient`;
+    const gradient = document.createElementNS(xmlns, "linearGradient")
+    defs.append(gradient)
+    gradient.id = `${id}-gradient`
 
-    const stopFirst = document.createElementNS(xmlns, 'stop');
-    gradient.append(stopFirst);
-    stopFirst.id = `${id}-gradient-first`;
-    stopFirst.setAttributeNS(null, 'offset', '50%');
-    stopFirst.setAttributeNS(null, 'stop-color', 'var(--spice-button-disabled)');
+    const stopFirst = document.createElementNS(xmlns, "stop")
+    gradient.append(stopFirst)
+    stopFirst.id = `${id}-gradient-first`
+    stopFirst.setAttributeNS(null, "offset", "50%")
+    stopFirst.setAttributeNS(null, "stop-color", "var(--spice-button-disabled)")
 
-    const stopSecond = document.createElementNS(xmlns, 'stop');
-    gradient.append(stopSecond);
-    stopSecond.id = `${id}-gradient-second`;
-    stopSecond.setAttributeNS(null, 'offset', '50%');
-    stopSecond.setAttributeNS(null, 'stop-color', 'var(--spice-button-disabled)');
+    const stopSecond = document.createElementNS(xmlns, "stop")
+    gradient.append(stopSecond)
+    stopSecond.id = `${id}-gradient-second`
+    stopSecond.setAttributeNS(null, "offset", "50%")
+    stopSecond.setAttributeNS(null, "stop-color", "var(--spice-button-disabled)")
 
-    const path = document.createElementNS(xmlns, 'path');
-    star.append(path);
-    path.setAttributeNS(null, 'fill', `url(#${gradient.id})`);
-    path.setAttributeNS(null, 'd', 'M20.388,10.918L32,12.118l-8.735,7.749L25.914,31.4l-9.893-6.088L6.127,31.4l2.695-11.533L0,12.118l11.547-1.2L16.026,0.6L20.388,10.918z');
+    const path = document.createElementNS(xmlns, "path")
+    star.append(path)
+    path.setAttributeNS(null, "fill", `url(#${gradient.id})`)
+    path.setAttributeNS(null, "d", "M20.388,10.918L32,12.118l-8.735,7.749L25.914,31.4l-9.893-6.088L6.127,31.4l2.695-11.533L0,12.118l11.547-1.2L16.026,0.6L20.388,10.918z")
 
-    return [star, stopFirst, stopSecond];
+    return [star, stopFirst, stopSecond]
 }
 
 function createStars(idSuffix, size) {
-    const stars = document.createElement('span');
-    const id = `stars-${idSuffix}`;
-    stars.className = 'stars';
-    stars.id = id;
-    stars.style.whiteSpace = 'nowrap';
-    stars.style.alignItems = 'center';
-    stars.style.display = 'flex';
+    const stars = document.createElement("span")
+    const id = `stars-${idSuffix}`
+    stars.className = "stars"
+    stars.id = id
+    stars.style.whiteSpace = "nowrap"
+    stars.style.alignItems = "center"
+    stars.style.display = "flex"
 
-    const starElements = [];
+    const starElements = []
     for (let i = 0; i < 5; i++) {
-        const [star, stopFirst, stopSecond] = createStar(id, i + 1, size);
-        stars.append(star);
-        starElements.push([star, stopFirst, stopSecond]);
+        const [star, stopFirst, stopSecond] = createStar(id, i + 1, size)
+        stars.append(star)
+        starElements.push([star, stopFirst, stopSecond])
     }
 
-    return [stars, starElements];
+    return [stars, starElements]
 }
 
 function getTracklistTrackUri(tracklistElement) {
     let values = Object.values(tracklistElement)
-    if (!values) return null;
+    if (!values) return null
 
-    return values[0] ?.pendingProps ?.children[0] ?.props ?.children ?.props ?.uri ||
-        values[0] ?.pendingProps ?.children[0] ?.props ?.children ?.props ?.children ?.props ?.uri ||
-        values[0] ?.pendingProps ?.children[0] ?.props ?.children[0] ?.props ?.uri
+    return (
+        values[0]?.pendingProps?.children[0]?.props?.children?.props?.uri ||
+        values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.uri ||
+        values[0]?.pendingProps?.children[0]?.props?.children[0]?.props?.uri
+    )
 }
 
 function setRating(starElements, rating) {
-    const halfStars = rating /= 0.5;
+    const halfStars = (rating /= 0.5)
     for (let i = 0; i < 5; i++) {
-        const stopFirst = starElements[i][1];
-        const stopSecond = starElements[i][2];
-        stopFirst.setAttributeNS(null, 'stop-color', 'var(--spice-button-disabled)');
-        stopSecond.setAttributeNS(null, 'stop-color', 'var(--spice-button-disabled)');
+        const stopFirst = starElements[i][1]
+        const stopSecond = starElements[i][2]
+        stopFirst.setAttributeNS(null, "stop-color", "var(--spice-button-disabled)")
+        stopSecond.setAttributeNS(null, "stop-color", "var(--spice-button-disabled)")
     }
     for (let i = 0; i < halfStars; i++) {
-        const j = Math.floor(i / 2);
-        const stopFirst = starElements[j][1];
-        const stopSecond = starElements[j][2];
+        const j = Math.floor(i / 2)
+        const stopFirst = starElements[j][1]
+        const stopSecond = starElements[j][2]
         if (i % 2 === 0) {
-            stopFirst.setAttributeNS(null, 'stop-color', 'var(--spice-button)');
+            stopFirst.setAttributeNS(null, "stop-color", "var(--spice-button)")
         } else {
-            stopSecond.setAttributeNS(null, 'stop-color', 'var(--spice-button)');
+            stopSecond.setAttributeNS(null, "stop-color", "var(--spice-button)")
         }
     }
 }
 
 function getMouseoverRating(star, i) {
-    const rect = star.getBoundingClientRect();
-    const offset = event.clientX - rect.left;
-    const half = offset > 8 || !SETTINGS.halfStarRatings;
-    const zeroStars = i === 0 && offset < 3;
-    let rating = i + 1;
-    if (!half)
-        rating -= 0.5;
+    const rect = star.getBoundingClientRect()
+    const offset = event.clientX - rect.left
+    const half = offset > 8 || !SETTINGS.halfStarRatings
+    const zeroStars = i === 0 && offset < 3
+    let rating = i + 1
+    if (!half) rating -= 0.5
     if (zeroStars) {
-        rating -= SETTINGS.halfStarRatings ? 0.5 : 1.0;
+        rating -= SETTINGS.halfStarRatings ? 0.5 : 1.0
     }
-    return rating.toFixed(1);
+    return rating.toFixed(1)
 }
 
-function displayIcon({
-    icon,
-    size
-}) {
-    return Spicetify.React.createElement('svg', {
+function displayIcon({ icon, size }) {
+    return Spicetify.React.createElement("svg", {
         width: size,
         height: size,
-        viewBox: '0 0 16 16',
-        fill: 'currentColor',
+        viewBox: "0 0 16 16",
+        fill: "currentColor",
         dangerouslySetInnerHTML: {
             __html: icon,
         },
-    });
+    })
 }
 
-function checkBoxItem({
-    name,
-    field,
-    onclick
-}) {
-    let [value, setValue] = Spicetify.React.useState(SETTINGS[field]);
+function checkBoxItem({ name, field, onclick }) {
+    let [value, setValue] = Spicetify.React.useState(SETTINGS[field])
     return Spicetify.React.createElement(
-        'div', {
-            className: 'popup-row'
+        "div",
+        {
+            className: "popup-row",
         },
-        Spicetify.React.createElement('label', {
-            className: 'col description'
-        }, name),
         Spicetify.React.createElement(
-            'div', {
-                className: 'col action'
+            "label",
+            {
+                className: "col description",
+            },
+            name
+        ),
+        Spicetify.React.createElement(
+            "div",
+            {
+                className: "col action",
             },
             Spicetify.React.createElement(
-                'button', {
-                    className: 'checkbox' + (value ? '' : ' disabled'),
+                "button",
+                {
+                    className: "checkbox" + (value ? "" : " disabled"),
                     onClick: async () => {
-                        let state = !value;
-                        SETTINGS[field] = state;
-                        setValue(state);
-                        await saveSettings();
-                        onclick();
+                        let state = !value
+                        SETTINGS[field] = state
+                        setValue(state)
+                        await saveSettings()
+                        onclick()
                     },
                 },
                 Spicetify.React.createElement(displayIcon, {
                     icon: Spicetify.SVGIcons.check,
-                    size: 16
+                    size: 16,
                 })
             )
         )
-    );
+    )
 }
 
-function dropDownItem({
-    name,
-    field,
-    options,
-    onclick
-}) {
-    const [value, setValue] = Spicetify.React.useState(SETTINGS[field]);
+function dropDownItem({ name, field, options, onclick }) {
+    const [value, setValue] = Spicetify.React.useState(SETTINGS[field])
     return Spicetify.React.createElement(
-        'div', {
-            className: 'popup-row'
+        "div",
+        {
+            className: "popup-row",
         },
-        Spicetify.React.createElement('label', {
-            className: 'col description'
-        }, name),
         Spicetify.React.createElement(
-            'div', {
-                className: 'col action'
+            "label",
+            {
+                className: "col description",
+            },
+            name
+        ),
+        Spicetify.React.createElement(
+            "div",
+            {
+                className: "col action",
             },
             Spicetify.React.createElement(
-                'select', {
+                "select",
+                {
                     value,
                     onChange: async (e) => {
-                        setValue(e.target.value);
-                        SETTINGS[field] = e.target.value;
-                        await saveSettings();
-                        onclick();
+                        setValue(e.target.value)
+                        SETTINGS[field] = e.target.value
+                        await saveSettings()
+                        onclick()
                     },
                 },
                 Object.keys(options).map((item) =>
                     Spicetify.React.createElement(
-                        'option', {
+                        "option",
+                        {
                             value: item,
                         },
                         options[item]
@@ -363,218 +367,344 @@ function dropDownItem({
                 )
             )
         )
-    );
+    )
 }
 
 function keyboardShortcutDescription(label, numberKey) {
-    return Spicetify.React.createElement('li', {
-        className: 'main-keyboardShortcutsHelpModal-sectionItem'
-    },
-        Spicetify.React.createElement('span', {
-            className: 'Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-sectionItemName'
-        }, label),
-        Spicetify.React.createElement('kbd', {
-            className: 'Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-key'
-        }, 'Ctrl'),
-        Spicetify.React.createElement('kbd', {
-            className: 'Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-key'
-        }, 'Alt'),
-        Spicetify.React.createElement('kbd', {
-            className: 'Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-key'
-        }, numberKey)
+    return Spicetify.React.createElement(
+        "li",
+        {
+            className: "main-keyboardShortcutsHelpModal-sectionItem",
+        },
+        Spicetify.React.createElement(
+            "span",
+            {
+                className: "Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-sectionItemName",
+            },
+            label
+        ),
+        Spicetify.React.createElement(
+            "kbd",
+            {
+                className: "Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-key",
+            },
+            "Ctrl"
+        ),
+        Spicetify.React.createElement(
+            "kbd",
+            {
+                className: "Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-key",
+            },
+            "Alt"
+        ),
+        Spicetify.React.createElement(
+            "kbd",
+            {
+                className: "Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-key",
+            },
+            numberKey
+        )
     )
 }
 
 function getPageType() {
-    const pathname = Spicetify.Platform.History.location.pathname;
-    let matches = null;
-    if (pathname === '/collection/tracks') {
-        return ['LIKED_SONGS', null];
+    const pathname = Spicetify.Platform.History.location.pathname
+    let matches = null
+    if (pathname === "/collection/tracks") {
+        return ["LIKED_SONGS", null]
     }
     if ((matches = pathname.match(/playlist\/(.*)/))) {
-        return ['PLAYLIST', matches[1]];
+        return ["PLAYLIST", matches[1]]
     }
     if ((matches = pathname.match(/album\/(.*)/))) {
-        return ['ALBUM', matches[1]];
+        return ["ALBUM", matches[1]]
     }
     if ((matches = pathname.match(/artist\/([^/]*)$/))) {
-        return ['ARTIST', matches[1]];
+        return ["ARTIST", matches[1]]
     }
     if ((matches = pathname.match(/artist\/([^/]*)\/saved/))) {
-        return ['ARTIST_LIKED', matches[1]];
+        return ["ARTIST_LIKED", matches[1]]
     }
-    return ['OTHER', null];
+    return ["OTHER", null]
 }
 
-(async function StarRatings() {
+;(async function StarRatings() {
     while (!Spicetify.showNotification) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 500))
     }
 
-    SETTINGS = await getSettings();
-    await saveSettings();
+    SETTINGS = await getSettings()
+    await saveSettings()
 
-    let oldTracklist = null;
-    let tracklist = null;
+    let oldTracklist = null
+    let tracklist = null
 
-    let oldNowPlayingWidget = null;
-    let nowPlayingWidget = null;
+    let oldNowPlayingWidget = null
+    let nowPlayingWidget = null
 
-    let [playlists, ratedFolderUid, ratings] = await getRatings();
-    let [pageType, id] = [null, null];
-    let updateNowPlayingWidget = null;
-    let updateTracklist = null;
-    let albumStarData = null;
-    let nowPlayingWidgetStarData = null;
+    let [playlists, ratedFolderUid, ratings] = await getRatings()
+    let [pageType, id] = [null, null]
+    let updateNowPlayingWidget = null
+    let updateTracklist = null
+    let albumStarData = null
+    let nowPlayingWidgetStarData = null
 
-    const getNowPlayingHeart = () => { return document.querySelector('.main-nowPlayingWidget-nowPlaying .control-button-heart'); };
+    const getNowPlayingHeart = () => {
+        return document.querySelector(".main-nowPlayingWidget-nowPlaying .control-button-heart")
+    }
 
-    const getNowPlayingTrackUri = () => { return Spicetify.Player.data.track.uri; };
+    const getNowPlayingTrackUri = () => {
+        return Spicetify.Player.data.track.uri
+    }
 
     const updateAlbumRating = async () => {
-        if (pageType !== 'ALBUM') return;
+        if (pageType !== "ALBUM") return
+        ;[playlists, ratedFolderUid, ratings] = await getRatings()
 
-        [playlists, ratedFolderUid, ratings] = await getRatings();
-
-        const album = await getAlbum(id);
-        const tracks = album.discs[0].tracks;
-        let sumRatings = 0.0;
-        let numRatings = 0;
+        const album = await getAlbum(id)
+        const tracks = album.discs[0].tracks
+        let sumRatings = 0.0
+        let numRatings = 0
 
         for (const track of tracks) {
-            const rating = ratings[track.uri];
-            if (!rating) continue;
-            sumRatings += parseFloat(rating);
-            numRatings += 1;
+            const rating = ratings[track.uri]
+            if (!rating) continue
+            sumRatings += parseFloat(rating)
+            numRatings += 1
         }
 
-        let averageRating = 0.0;
-        if (numRatings > 0)
-            averageRating = sumRatings / numRatings;
+        let averageRating = 0.0
+        if (numRatings > 0) averageRating = sumRatings / numRatings
         // Round to nearest 0.5
-        averageRating = (Math.round(averageRating * 2) / 2).toFixed(1);
+        averageRating = (Math.round(averageRating * 2) / 2).toFixed(1)
 
-        const actionBar = await _waitForElement('.main-actionBar-ActionBar');
-        const hasStars = actionBar.querySelector('.stars');
-        const playButton = actionBar.querySelector('.main-playButton-PlayButton');
+        const actionBar = await _waitForElement(".main-actionBar-ActionBar")
+        const hasStars = actionBar.querySelector(".stars")
+        const playButton = actionBar.querySelector(".main-playButton-PlayButton")
 
         if (!hasStars) {
-            albumStarData = createStars('album', 32);
-            playButton.after(albumStarData[0]);
+            albumStarData = createStars("album", 32)
+            playButton.after(albumStarData[0])
         }
-        setRating(albumStarData[1], averageRating.toString());
+        setRating(albumStarData[1], averageRating.toString())
     }
 
     function getClickListener(i, ratingOverride, starData, getTrackUri, doUpdateNowPlayingWidget, doUpdateTracklist, getHeart) {
         const getCurrentRating = (trackUri) => {
-            return ratings[trackUri] ? ratings[trackUri] : '0.0';
+            return ratings[trackUri] ? ratings[trackUri] : "0.0"
         }
 
-        const [stars, starElements] = starData;
-        const star = starElements[i][0];
+        const [stars, starElements] = starData
+        const star = starElements[i][0]
 
         return async () => {
-            const trackUri = getTrackUri();
-            const currentRating = getCurrentRating(trackUri);
-            let newRating = (ratingOverride !== null) ? ratingOverride : getMouseoverRating(star, i);
+            const trackUri = getTrackUri()
+            const currentRating = getCurrentRating(trackUri)
+            let newRating = ratingOverride !== null ? ratingOverride : getMouseoverRating(star, i)
 
-            const heart = getHeart();
-            if (heart && SETTINGS.likeThreshold !== 'disabled') {
-                if (heart.ariaChecked !== 'true' && newRating >= parseFloat(SETTINGS.likeThreshold))
-                    heart.click();
-                if (heart.ariaChecked === 'true' && newRating < parseFloat(SETTINGS.likeThreshold))
-                    heart.click();
+            const heart = getHeart()
+            if (heart && SETTINGS.likeThreshold !== "disabled") {
+                if (heart.ariaChecked !== "true" && newRating >= parseFloat(SETTINGS.likeThreshold)) heart.click()
+                if (heart.ariaChecked === "true" && newRating < parseFloat(SETTINGS.likeThreshold)) heart.click()
             }
 
             const removeRating = currentRating === newRating && ratings[trackUri]
             if (removeRating) {
-                newRating = '0.0';
+                newRating = "0.0"
             }
 
-            const rating = ratings[trackUri];
-            const ratingString = newRating.toString();
+            const rating = ratings[trackUri]
+            const ratingString = newRating.toString()
             // Do this first because otherwise the track mouseout event will set the track row to hidden again
-            ratings[trackUri] = ratingString;
+            ratings[trackUri] = ratingString
 
-            setRating(starElements, newRating);
+            setRating(starElements, newRating)
 
             if (rating) {
-                const playlistUri = playlists[rating].uri;
-                const playlistId = playlistUriToId(playlistUri);
-                await deleteTrackFromPlaylist(playlistId, trackUri);
+                const playlistUri = playlists[rating].uri
+                const playlistId = playlistUriToId(playlistUri)
+                await deleteTrackFromPlaylist(playlistId, trackUri)
                 if (removeRating) {
-                    showNotification(`Removed from ${rating}`);
+                    showNotification(`Removed from ${rating}`)
                 }
             }
 
-            const playlist = playlists[ratingString];
-            let playlistUri = null;
+            const playlist = playlists[ratingString]
+            let playlistUri = null
 
             if (!playlist && !removeRating) {
                 if (!ratedFolderUid) {
-                    await createFolder('Rated');
-                    [playlists, ratedFolderUid] = await getRatedPlaylists();
+                    await createFolder("Rated")
+                    ;[playlists, ratedFolderUid] = await getRatedPlaylists()
                 }
-                playlistUri = await createPlaylist(ratingString, ratedFolderUid);
-                await makePlaylistPrivate(playlistUri);
-                [playlists, ratedFolderUid] = await getRatedPlaylists();
+                playlistUri = await createPlaylist(ratingString, ratedFolderUid)
+                await makePlaylistPrivate(playlistUri)
+                ;[playlists, ratedFolderUid] = await getRatedPlaylists()
             }
 
             if (!removeRating) {
-                playlistUri = playlists[ratingString].uri;
-                const playlistId = playlistUriToId(playlistUri);
-                await addTrackToPlaylist(playlistId, trackUri);
-                showNotification((rating ? 'Moved' : 'Added') + ` to ${ratingString}`);
-                ratings[trackUri] = ratingString;
+                playlistUri = playlists[ratingString].uri
+                const playlistId = playlistUriToId(playlistUri)
+                await addTrackToPlaylist(playlistId, trackUri)
+                showNotification((rating ? "Moved" : "Added") + ` to ${ratingString}`)
+                ratings[trackUri] = ratingString
             } else {
-                delete ratings[trackUri];
+                delete ratings[trackUri]
             }
 
             if (doUpdateNowPlayingWidget && updateNowPlayingWidget) {
-                updateNowPlayingWidget();
+                updateNowPlayingWidget()
             }
 
             if (doUpdateTracklist && updateTracklist) {
-                const nowPlayingStars = document.getElementById(`stars-${trackUri}`);
-                if (nowPlayingStars)
-                    nowPlayingStars.remove();
-                await updateTracklist();
+                const nowPlayingStars = document.getElementById(`stars-${trackUri}`)
+                if (nowPlayingStars) nowPlayingStars.remove()
+                await updateTracklist()
             }
 
-            await updateAlbumRating();
-
-        };
+            await updateAlbumRating()
+        }
     }
 
     const registerKeyboardShortcuts = () => {
-        Spicetify.Keyboard.registerShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_0, ctrl: true, alt: true }, getClickListener(4, '5.0', nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart));
-        Spicetify.Keyboard.registerShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_1, ctrl: true, alt: true }, getClickListener(0, '0.5', nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart));
-        Spicetify.Keyboard.registerShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_2, ctrl: true, alt: true }, getClickListener(0, '1.0', nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart));
-        Spicetify.Keyboard.registerShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_3, ctrl: true, alt: true }, getClickListener(1, '1.5', nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart));
-        Spicetify.Keyboard.registerShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_4, ctrl: true, alt: true }, getClickListener(1, '2.0', nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart));
-        Spicetify.Keyboard.registerShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_5, ctrl: true, alt: true }, getClickListener(2, '2.5', nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart));
-        Spicetify.Keyboard.registerShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_6, ctrl: true, alt: true }, getClickListener(2, '3.0', nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart));
-        Spicetify.Keyboard.registerShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_7, ctrl: true, alt: true }, getClickListener(3, '3.5', nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart));
-        Spicetify.Keyboard.registerShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_8, ctrl: true, alt: true }, getClickListener(3, '4.0', nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart));
-        Spicetify.Keyboard.registerShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_9, ctrl: true, alt: true }, getClickListener(4, '4.5', nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart));
+        Spicetify.Keyboard.registerShortcut(
+            {
+                key: Spicetify.Keyboard.KEYS.NUMPAD_0,
+                ctrl: true,
+                alt: true,
+            },
+            getClickListener(4, "5.0", nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
+        )
+        Spicetify.Keyboard.registerShortcut(
+            {
+                key: Spicetify.Keyboard.KEYS.NUMPAD_1,
+                ctrl: true,
+                alt: true,
+            },
+            getClickListener(0, "0.5", nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
+        )
+        Spicetify.Keyboard.registerShortcut(
+            {
+                key: Spicetify.Keyboard.KEYS.NUMPAD_2,
+                ctrl: true,
+                alt: true,
+            },
+            getClickListener(0, "1.0", nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
+        )
+        Spicetify.Keyboard.registerShortcut(
+            {
+                key: Spicetify.Keyboard.KEYS.NUMPAD_3,
+                ctrl: true,
+                alt: true,
+            },
+            getClickListener(1, "1.5", nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
+        )
+        Spicetify.Keyboard.registerShortcut(
+            {
+                key: Spicetify.Keyboard.KEYS.NUMPAD_4,
+                ctrl: true,
+                alt: true,
+            },
+            getClickListener(1, "2.0", nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
+        )
+        Spicetify.Keyboard.registerShortcut(
+            {
+                key: Spicetify.Keyboard.KEYS.NUMPAD_5,
+                ctrl: true,
+                alt: true,
+            },
+            getClickListener(2, "2.5", nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
+        )
+        Spicetify.Keyboard.registerShortcut(
+            {
+                key: Spicetify.Keyboard.KEYS.NUMPAD_6,
+                ctrl: true,
+                alt: true,
+            },
+            getClickListener(2, "3.0", nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
+        )
+        Spicetify.Keyboard.registerShortcut(
+            {
+                key: Spicetify.Keyboard.KEYS.NUMPAD_7,
+                ctrl: true,
+                alt: true,
+            },
+            getClickListener(3, "3.5", nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
+        )
+        Spicetify.Keyboard.registerShortcut(
+            {
+                key: Spicetify.Keyboard.KEYS.NUMPAD_8,
+                ctrl: true,
+                alt: true,
+            },
+            getClickListener(3, "4.0", nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
+        )
+        Spicetify.Keyboard.registerShortcut(
+            {
+                key: Spicetify.Keyboard.KEYS.NUMPAD_9,
+                ctrl: true,
+                alt: true,
+            },
+            getClickListener(4, "4.5", nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
+        )
     }
 
     const deregisterKeyboardShortcuts = () => {
-        Spicetify.Keyboard._deregisterShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_0, ctrl: true, alt: true });
-        Spicetify.Keyboard._deregisterShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_1, ctrl: true, alt: true });
-        Spicetify.Keyboard._deregisterShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_2, ctrl: true, alt: true });
-        Spicetify.Keyboard._deregisterShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_3, ctrl: true, alt: true });
-        Spicetify.Keyboard._deregisterShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_4, ctrl: true, alt: true });
-        Spicetify.Keyboard._deregisterShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_5, ctrl: true, alt: true });
-        Spicetify.Keyboard._deregisterShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_6, ctrl: true, alt: true });
-        Spicetify.Keyboard._deregisterShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_7, ctrl: true, alt: true });
-        Spicetify.Keyboard._deregisterShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_8, ctrl: true, alt: true });
-        Spicetify.Keyboard._deregisterShortcut({ key: Spicetify.Keyboard.KEYS.NUMPAD_9, ctrl: true, alt: true });
+        Spicetify.Keyboard._deregisterShortcut({
+            key: Spicetify.Keyboard.KEYS.NUMPAD_0,
+            ctrl: true,
+            alt: true,
+        })
+        Spicetify.Keyboard._deregisterShortcut({
+            key: Spicetify.Keyboard.KEYS.NUMPAD_1,
+            ctrl: true,
+            alt: true,
+        })
+        Spicetify.Keyboard._deregisterShortcut({
+            key: Spicetify.Keyboard.KEYS.NUMPAD_2,
+            ctrl: true,
+            alt: true,
+        })
+        Spicetify.Keyboard._deregisterShortcut({
+            key: Spicetify.Keyboard.KEYS.NUMPAD_3,
+            ctrl: true,
+            alt: true,
+        })
+        Spicetify.Keyboard._deregisterShortcut({
+            key: Spicetify.Keyboard.KEYS.NUMPAD_4,
+            ctrl: true,
+            alt: true,
+        })
+        Spicetify.Keyboard._deregisterShortcut({
+            key: Spicetify.Keyboard.KEYS.NUMPAD_5,
+            ctrl: true,
+            alt: true,
+        })
+        Spicetify.Keyboard._deregisterShortcut({
+            key: Spicetify.Keyboard.KEYS.NUMPAD_6,
+            ctrl: true,
+            alt: true,
+        })
+        Spicetify.Keyboard._deregisterShortcut({
+            key: Spicetify.Keyboard.KEYS.NUMPAD_7,
+            ctrl: true,
+            alt: true,
+        })
+        Spicetify.Keyboard._deregisterShortcut({
+            key: Spicetify.Keyboard.KEYS.NUMPAD_8,
+            ctrl: true,
+            alt: true,
+        })
+        Spicetify.Keyboard._deregisterShortcut({
+            key: Spicetify.Keyboard.KEYS.NUMPAD_9,
+            ctrl: true,
+            alt: true,
+        })
     }
 
     function displaySettings() {
         const style = Spicetify.React.createElement(
-            'style',
+            "style",
             null,
             `.popup-row::after {
                         content: "";
@@ -651,259 +781,275 @@ function getPageType() {
                         vertical-align: baseline;
                         touch-action: manipulation;
                     }`
-        );
+        )
 
         let settingsContent = Spicetify.React.createElement(
-            'div',
+            "div",
             null,
             style,
-            Spicetify.React.createElement('h2', {
-                className: 'Type__TypeElement-goli3j-0 bcTfIx main-keyboardShortcutsHelpModal-sectionHeading'
-            }, 'Settings'),
+            Spicetify.React.createElement(
+                "h2",
+                {
+                    className: "Type__TypeElement-goli3j-0 bcTfIx main-keyboardShortcutsHelpModal-sectionHeading",
+                },
+                "Settings"
+            ),
             Spicetify.React.createElement(checkBoxItem, {
-                name: 'Half star ratings',
-                field: 'halfStarRatings',
+                name: "Half star ratings",
+                field: "halfStarRatings",
                 onclick: async () => {},
             }),
             Spicetify.React.createElement(checkBoxItem, {
-                name: 'Hide hearts',
-                field: 'hideHearts',
+                name: "Hide hearts",
+                field: "hideHearts",
                 onclick: async () => {
-                    const nowPlayingWidgetHeart = document.querySelector('.control-button-heart');
-                    if (nowPlayingWidgetHeart)
-                        nowPlayingWidgetHeart.style.display = SETTINGS.hideHearts ? 'none' : 'flex';
-                    const hearts = document.querySelectorAll('.main-trackList-rowHeartButton');
-                    for (const heart of hearts)
-                        heart.style.display = SETTINGS.hideHearts ? 'none' : 'flex';
+                    const nowPlayingWidgetHeart = document.querySelector(".control-button-heart")
+                    if (nowPlayingWidgetHeart) nowPlayingWidgetHeart.style.display = SETTINGS.hideHearts ? "none" : "flex"
+                    const hearts = document.querySelectorAll(".main-trackList-rowHeartButton")
+                    for (const heart of hearts) heart.style.display = SETTINGS.hideHearts ? "none" : "flex"
                 },
             }),
             Spicetify.React.createElement(checkBoxItem, {
-                name: 'Enable keyboard shortcuts',
-                field: 'enableKeyboardShortcuts',
+                name: "Enable keyboard shortcuts",
+                field: "enableKeyboardShortcuts",
                 onclick: async () => {
                     if (SETTINGS.enableKeyboardShortcuts) {
-                        registerKeyboardShortcuts();
+                        registerKeyboardShortcuts()
                     } else {
-                        deregisterKeyboardShortcuts();
+                        deregisterKeyboardShortcuts()
                     }
-                }
+                },
             }),
             Spicetify.React.createElement(checkBoxItem, {
-                name: 'Show playlist stars',
-                field: 'showPlaylistStars',
+                name: "Show playlist stars",
+                field: "showPlaylistStars",
                 onclick: async () => {},
             }),
             Spicetify.React.createElement(dropDownItem, {
-                name: 'Auto-like/dislike threshold',
-                field: 'likeThreshold',
+                name: "Auto-like/dislike threshold",
+                field: "likeThreshold",
                 options: {
-                    disabled: 'Disabled',
-                    '3.0': '3.0',
-                    '3.5': '3.5',
-                    '4.0': '4.0',
-                    '4.5': '4.5',
-                    '5.0': '5.0',
+                    disabled: "Disabled",
+                    "3.0": "3.0",
+                    3.5: "3.5",
+                    "4.0": "4.0",
+                    4.5: "4.5",
+                    "5.0": "5.0",
                 },
                 onclick: async () => {},
             }),
-            Spicetify.React.createElement('h2', {
-                className: 'Type__TypeElement-goli3j-0 bcTfIx main-keyboardShortcutsHelpModal-sectionHeading'
-            }, 'Keyboard Shortcuts'),
-            Spicetify.React.createElement('ul', null,
-                keyboardShortcutDescription('Rate current track 0.5 stars', '1'),
-                keyboardShortcutDescription('Rate current track 1 star', '2'),
-                keyboardShortcutDescription('Rate current track 1.5 stars', '3'),
-                keyboardShortcutDescription('Rate current track 2 stars', '4'),
-                keyboardShortcutDescription('Rate current track 2.5 stars', '5'),
-                keyboardShortcutDescription('Rate current track 3 stars', '6'),
-                keyboardShortcutDescription('Rate current track 3.5 stars', '7'),
-                keyboardShortcutDescription('Rate current track 4 stars', '8'),
-                keyboardShortcutDescription('Rate current track 4.5 stars', '9'),
-                keyboardShortcutDescription('Rate current track 5 stars', '0')
+            Spicetify.React.createElement(
+                "h2",
+                {
+                    className: "Type__TypeElement-goli3j-0 bcTfIx main-keyboardShortcutsHelpModal-sectionHeading",
+                },
+                "Keyboard Shortcuts"
+            ),
+            Spicetify.React.createElement(
+                "ul",
+                null,
+                keyboardShortcutDescription("Rate current track 0.5 stars", "1"),
+                keyboardShortcutDescription("Rate current track 1 star", "2"),
+                keyboardShortcutDescription("Rate current track 1.5 stars", "3"),
+                keyboardShortcutDescription("Rate current track 2 stars", "4"),
+                keyboardShortcutDescription("Rate current track 2.5 stars", "5"),
+                keyboardShortcutDescription("Rate current track 3 stars", "6"),
+                keyboardShortcutDescription("Rate current track 3.5 stars", "7"),
+                keyboardShortcutDescription("Rate current track 4 stars", "8"),
+                keyboardShortcutDescription("Rate current track 4.5 stars", "9"),
+                keyboardShortcutDescription("Rate current track 5 stars", "0")
             )
-        );
+        )
         Spicetify.PopupModal.display({
-            title: 'Star Ratings',
+            title: "Star Ratings",
             content: settingsContent,
-            isLarge: true
-        });
+            isLarge: true,
+        })
     }
 
-    new Spicetify.Menu.Item('Star Ratings', false, displaySettings).register();
-
+    new Spicetify.Menu.Item("Star Ratings", false, displaySettings).register()
 
     const addStarsListeners = (starData, getTrackUri, doUpdateNowPlayingWidget, doUpdateTracklist, getHeart) => {
         const getCurrentRating = (trackUri) => {
-            return ratings[trackUri] ? ratings[trackUri] : '0.0';
+            return ratings[trackUri] ? ratings[trackUri] : "0.0"
         }
 
-        const [stars, starElements] = starData;
+        const [stars, starElements] = starData
 
-        stars.addEventListener('mouseout', function() {
-            setRating(starElements, getCurrentRating(getTrackUri()));
-        });
+        stars.addEventListener("mouseout", function () {
+            setRating(starElements, getCurrentRating(getTrackUri()))
+        })
 
         for (let i = 0; i < 5; i++) {
-            const star = starElements[i][0];
+            const star = starElements[i][0]
 
-            star.addEventListener('mouseover', function() {
-                const rating = getMouseoverRating(star, i);
-                setRating(starElements, rating);
-            });
+            star.addEventListener("mouseover", function () {
+                const rating = getMouseoverRating(star, i)
+                setRating(starElements, rating)
+            })
 
-            star.addEventListener('click', getClickListener(i, null, starData, getTrackUri, doUpdateNowPlayingWidget, doUpdateTracklist, getHeart));
+            star.addEventListener("click", getClickListener(i, null, starData, getTrackUri, doUpdateNowPlayingWidget, doUpdateTracklist, getHeart))
         }
     }
 
     updateTracklist = () => {
-        if (!SETTINGS.showPlaylistStars) return;
-        const tracklist_ = document.querySelector('.main-trackList-indexable');
-        if (!tracklist_) return;
-        const tracks = tracklist_.getElementsByClassName('main-trackList-trackListRow');
+        if (!SETTINGS.showPlaylistStars) return
+        const tracklist_ = document.querySelector(".main-trackList-indexable")
+        if (!tracklist_) return
+        const tracks = tracklist_.getElementsByClassName("main-trackList-trackListRow")
 
-        const tracklistHeader = document.querySelector('.main-trackList-trackListHeaderRow');
+        const tracklistHeader = document.querySelector(".main-trackList-trackListHeaderRow")
         // No tracklist header on Artist page
         if (tracklistHeader) {
-            let lastColumn = tracklistHeader.querySelector('.main-trackList-rowSectionEnd');
-            let colIndexInt = parseInt(lastColumn.getAttribute('aria-colindex'));
+            let lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd")
+            let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"))
 
             switch (colIndexInt) {
                 case 4:
-                    tracklistHeader.style['grid-template-columns'] = fiveColumnGridCss;
-                    break;
+                    tracklistHeader.style["grid-template-columns"] = fiveColumnGridCss
+                    break
                 case 5:
-                    tracklistHeader.style['grid-template-columns'] = sixColumnGridCss;
-                    break;
+                    tracklistHeader.style["grid-template-columns"] = sixColumnGridCss
+                    break
                 case 6:
-                    tracklistHeader.style['grid-template-columns'] = sevenColumnGridCss;
-                    break;
+                    tracklistHeader.style["grid-template-columns"] = sevenColumnGridCss
+                    break
                 default:
-                    break;
+                    break
             }
         }
 
         for (const track of tracks) {
-            const getHeart = () => { return track.getElementsByClassName('main-addButton-button')[0]; };
-            const heart = track.getElementsByClassName('main-addButton-button')[0];
-            const hasStars = track.getElementsByClassName('stars').length > 0;
-            const trackUri = getTracklistTrackUri(track);
-            const isTrack = trackUri.includes('track');
+            const getHeart = () => {
+                return track.getElementsByClassName("main-addButton-button")[0]
+            }
+            const heart = track.getElementsByClassName("main-addButton-button")[0]
+            const hasStars = track.getElementsByClassName("stars").length > 0
+            const trackUri = getTracklistTrackUri(track)
+            const isTrack = trackUri.includes("track")
 
-            let ratingColumn = track.querySelector('.starRatings');
+            let ratingColumn = track.querySelector(".starRatings")
             if (!ratingColumn) {
                 // Add column for stars
-                let lastColumn = track.querySelector('.main-trackList-rowSectionEnd');
-                let colIndexInt = parseInt(lastColumn.getAttribute('aria-colindex'));
-                lastColumn.setAttribute('aria-colindex', (colIndexInt + 1).toString());
-                ratingColumn = document.createElement('div');
-                ratingColumn.setAttribute('aria-colindex', colIndexInt.toString());
-                ratingColumn.role = 'gridcell';
-                ratingColumn.style.display = 'flex';
-                ratingColumn.classList.add('main-trackList-rowSectionVariable');
-                ratingColumn.classList.add('starRatings');
-                track.insertBefore(ratingColumn, lastColumn);
+                let lastColumn = track.querySelector(".main-trackList-rowSectionEnd")
+                let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"))
+                lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString())
+                ratingColumn = document.createElement("div")
+                ratingColumn.setAttribute("aria-colindex", colIndexInt.toString())
+                ratingColumn.role = "gridcell"
+                ratingColumn.style.display = "flex"
+                ratingColumn.classList.add("main-trackList-rowSectionVariable")
+                ratingColumn.classList.add("starRatings")
+                track.insertBefore(ratingColumn, lastColumn)
 
                 switch (colIndexInt) {
                     case 4:
-                        track.style['grid-template-columns'] = fiveColumnGridCss;
-                        break;
+                        track.style["grid-template-columns"] = fiveColumnGridCss
+                        break
                     case 5:
-                        track.style['grid-template-columns'] = sixColumnGridCss;
-                        break;
+                        track.style["grid-template-columns"] = sixColumnGridCss
+                        break
                     case 6:
-                        track.style['grid-template-columns'] = sevenColumnGridCss;
-                        break;
+                        track.style["grid-template-columns"] = sevenColumnGridCss
+                        break
                     default:
-                        break;
+                        break
                 }
             }
 
-            if (!heart || !trackUri || hasStars || !isTrack) continue;
+            if (!heart || !trackUri || hasStars || !isTrack) continue
 
-            const starData = createStars(trackUri, 16);
-            const stars = starData[0];
-            const starElements = starData[1];
-            const currentRating = ratings[trackUri] ? ratings[trackUri] : '0.0';
-            ratingColumn.appendChild(stars);
-            setRating(starElements, currentRating);
-            getHeart().style.display = SETTINGS.hideHearts ? 'none' : 'flex';
-            addStarsListeners(starData, () => { return trackUri; }, true, false, getHeart);
+            const starData = createStars(trackUri, 16)
+            const stars = starData[0]
+            const starElements = starData[1]
+            const currentRating = ratings[trackUri] ? ratings[trackUri] : "0.0"
+            ratingColumn.appendChild(stars)
+            setRating(starElements, currentRating)
+            getHeart().style.display = SETTINGS.hideHearts ? "none" : "flex"
+            addStarsListeners(
+                starData,
+                () => {
+                    return trackUri
+                },
+                true,
+                false,
+                getHeart
+            )
 
             // Add listeners for hovering over a track in the tracklist
-            stars.style.visibility = ratings[trackUri] ? 'visible' : 'hidden';
+            stars.style.visibility = ratings[trackUri] ? "visible" : "hidden"
 
-            track.addEventListener('mouseover', () => {
-                stars.style.visibility = 'visible';
-            });
+            track.addEventListener("mouseover", () => {
+                stars.style.visibility = "visible"
+            })
 
-            track.addEventListener('mouseout', () => {
-                stars.style.visibility = ratings[trackUri] ? 'visible' : 'hidden';
-            });
+            track.addEventListener("mouseout", () => {
+                stars.style.visibility = ratings[trackUri] ? "visible" : "hidden"
+            })
         }
-    };
+    }
 
     updateNowPlayingWidget = () => {
-        if (!nowPlayingWidgetStarData) return;
+        if (!nowPlayingWidgetStarData) return
 
-        const getTrackUri = () => { return Spicetify.Player.data.track.uri; };
-        const trackUri = getTrackUri();
-        const isTrack = trackUri.includes('track');
+        const getTrackUri = () => {
+            return Spicetify.Player.data.track.uri
+        }
+        const trackUri = getTrackUri()
+        const isTrack = trackUri.includes("track")
 
-        nowPlayingWidgetStarData[0].style.display = isTrack? 'flex' : 'none';
+        nowPlayingWidgetStarData[0].style.display = isTrack ? "flex" : "none"
 
-        const currentRating = ratings[trackUri] ? ratings[trackUri] : '0.0';
-        setRating(nowPlayingWidgetStarData[1], currentRating);
-    };
+        const currentRating = ratings[trackUri] ? ratings[trackUri] : "0.0"
+        setRating(nowPlayingWidgetStarData[1], currentRating)
+    }
 
     const tracklistObserver = new MutationObserver(() => {
-        updateTracklist();
-    });
+        updateTracklist()
+    })
 
-    Spicetify.Player.addEventListener('songchange', () => {
-        updateNowPlayingWidget();
-    });
+    Spicetify.Player.addEventListener("songchange", () => {
+        updateNowPlayingWidget()
+    })
 
     const observerCallback = async () => {
-        oldTracklist = tracklist;
-        tracklist = document.querySelector('.main-trackList-indexable');
+        oldTracklist = tracklist
+        tracklist = document.querySelector(".main-trackList-indexable")
         if (tracklist && !tracklist.isEqualNode(oldTracklist)) {
             if (oldTracklist) {
-                tracklistObserver.disconnect();
+                tracklistObserver.disconnect()
             }
-            [pageType, id] = getPageType();
-
-            [playlists, ratedFolderUid, ratings] = await getRatings();
-            updateTracklist();
-            if (pageType === 'ALBUM')
-                await updateAlbumRating();
+            ;[pageType, id] = getPageType()
+            ;[playlists, ratedFolderUid, ratings] = await getRatings()
+            updateTracklist()
+            if (pageType === "ALBUM") await updateAlbumRating()
             tracklistObserver.observe(tracklist, {
                 childList: true,
-                subtree: true
-            });
+                subtree: true,
+            })
         }
 
-        if (getNowPlayingHeart())
-            getNowPlayingHeart().style.display = SETTINGS.hideHearts ? 'none' : 'flex';
+        if (getNowPlayingHeart()) getNowPlayingHeart().style.display = SETTINGS.hideHearts ? "none" : "flex"
 
-        oldNowPlayingWidget = nowPlayingWidget;
-        nowPlayingWidget = document.querySelector('.main-nowPlayingWidget-nowPlaying');
+        oldNowPlayingWidget = nowPlayingWidget
+        nowPlayingWidget = document.querySelector(".main-nowPlayingWidget-nowPlaying")
         if (nowPlayingWidget && !nowPlayingWidget.isEqualNode(oldNowPlayingWidget)) {
-            nowPlayingWidgetStarData = createStars('now-playing', 16);
-            nowPlayingWidgetStarData[0].style.marginLeft = '8px';
-            nowPlayingWidgetStarData[0].style.marginRight = '8px';
-            const trackInfo = await _waitForElement('.main-nowPlayingWidget-nowPlaying .main-trackInfo-container');
-            trackInfo.after(nowPlayingWidgetStarData[0]);
-            addStarsListeners(nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart);
-            updateNowPlayingWidget();
+            nowPlayingWidgetStarData = createStars("now-playing", 16)
+            nowPlayingWidgetStarData[0].style.marginLeft = "8px"
+            nowPlayingWidgetStarData[0].style.marginRight = "8px"
+            const trackInfo = await _waitForElement(".main-nowPlayingWidget-nowPlaying .main-trackInfo-container")
+            trackInfo.after(nowPlayingWidgetStarData[0])
+            addStarsListeners(nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
+            updateNowPlayingWidget()
             if (SETTINGS.enableKeyboardShortcuts) {
-                registerKeyboardShortcuts();
+                registerKeyboardShortcuts()
             }
         }
     }
-    const observer = new MutationObserver(observerCallback);
-    await observerCallback();
+    const observer = new MutationObserver(observerCallback)
+    await observerCallback()
     observer.observe(document.body, {
         childList: true,
-        subtree: true
-    });
-})();
+        subtree: true,
+    })
+})()
