@@ -1,14 +1,16 @@
 // @ts-check
 // NAME: Star Ratings
 // AUTHOR: Scott Duffey
-// VERSION: 1.6.2
+// VERSION: 1.6.3
 // DESCRIPTION: Rate songs with stars and automatically save them to playlists
 
 /// <reference path='../globals.d.ts' />
 
-;(async function StarRatings() {
-    while (!Spicetify.showNotification) {
-        await new Promise((resolve) => setTimeout(resolve, 500))
+;(async function starRatings() {
+    const { Platform } = Spicetify
+    if (!Platform) {
+        setTimeout(starRatings, 300)
+        return
     }
 
     let SETTINGS = null
@@ -71,27 +73,24 @@
         Spicetify.showNotification(text)
     }
 
-    async function createPlaylist(name, folderUid) {
+    async function createPlaylist(name, folderUri) {
         return await Spicetify.Platform.RootlistAPI.createPlaylist(name, {
-            after: folderUid,
+            after: {
+                uri: folderUri,
+            },
         })
     }
 
     async function makePlaylistPrivate(playlistUri) {
-        try {
+        setTimeout(async () => {
             await Spicetify.CosmosAsync.post(`sp://core-playlist/v1/playlist/${playlistUri}/set-base-permission`, {
                 permission_level: "BLOCKED",
             })
-        } catch (error) {
-            await new Promise((resolve) => setTimeout(resolve, 500))
-            await Spicetify.CosmosAsync.post(`sp://core-playlist/v1/playlist/${playlistUri}/set-base-permission`, {
-                permission_level: "BLOCKED",
-            })
-        }
+        }, 1000)
     }
 
     async function createFolder(name) {
-        await Spicetify.Platform.RootlistAPI.createFolder(name)
+        await Spicetify.Platform.RootlistAPI.createFolder(name, { before: "" })
     }
 
     async function getAlbum(albumId) {
@@ -146,7 +145,7 @@
             return [[], null]
         }
         playlists = rated
-        return [filterRatedPlaylists(playlists), rated.uid]
+        return [filterRatedPlaylists(playlists), rated.uri]
     }
 
     async function getRatings() {
@@ -440,7 +439,7 @@
     let oldNowPlayingWidget = null
     let nowPlayingWidget = null
 
-    let [playlists, ratedFolderUid, ratings] = await getRatings()
+    let [playlists, ratedFolderUri, ratings] = await getRatings()
     let [pageType, id] = [null, null]
     let updateNowPlayingWidget = null
     let updateTracklist = null
@@ -457,7 +456,7 @@
 
     const updateAlbumRating = async () => {
         if (pageType !== "ALBUM") return
-        ;[playlists, ratedFolderUid, ratings] = await getRatings()
+        ;[playlists, ratedFolderUri, ratings] = await getRatings()
 
         const album = await getAlbum(id)
         const tracks = album.discs[0].tracks
@@ -531,13 +530,13 @@
             let playlistUri = null
 
             if (!playlist && !removeRating) {
-                if (!ratedFolderUid) {
+                if (!ratedFolderUri) {
                     await createFolder("Rated")
-                    ;[playlists, ratedFolderUid] = await getRatedPlaylists()
+                    ;[playlists, ratedFolderUri] = await getRatedPlaylists()
                 }
-                playlistUri = await createPlaylist(ratingString, ratedFolderUid)
+                playlistUri = await createPlaylist(ratingString, ratedFolderUri)
                 await makePlaylistPrivate(playlistUri)
-                ;[playlists, ratedFolderUid] = await getRatedPlaylists()
+                ;[playlists, ratedFolderUri] = await getRatedPlaylists()
             }
 
             if (!removeRating) {
@@ -1018,7 +1017,7 @@
                 tracklistObserver.disconnect()
             }
             ;[pageType, id] = getPageType()
-            ;[playlists, ratedFolderUid, ratings] = await getRatings()
+            ;[playlists, ratedFolderUri, ratings] = await getRatings()
             updateTracklist()
             if (pageType === "ALBUM") await updateAlbumRating()
             tracklistObserver.observe(tracklist, {
