@@ -74,11 +74,17 @@
     }
 
     async function createPlaylist(name, folderUri) {
-        return await Spicetify.Platform.RootlistAPI.createPlaylist(name, {
-            after: {
-                uri: folderUri,
-            },
-        })
+        if (navigator.platform.startsWith("Linux") && navigator.userAgent.includes("Spotify/1.1.84.716")) {
+            return await Spicetify.Platform.RootlistAPI.createPlaylist(name, {
+                after: folderUri,
+            })
+        } else {
+            return await Spicetify.Platform.RootlistAPI.createPlaylist(name, {
+                after: {
+                    uri: folderUri,
+                },
+            })
+        }
     }
 
     async function makePlaylistPrivate(playlistUri) {
