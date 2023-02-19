@@ -1,3 +1,5 @@
+import * as api from "./api";
+
 async function main() {
     while (!Spicetify?.showNotification) {
         await new Promise((resolve) => setTimeout(resolve, 100));
@@ -8,23 +10,15 @@ async function main() {
     const sixColumnGridCss = "[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] 2fr [last] minmax(120px,1fr)";
     const sevenColumnGridCss = "[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var3] 2fr [last] minmax(120px,1fr)";
 
-    async function getLocalStorageData(key) {
-        return Spicetify.LocalStorage.get(key);
-    }
-
-    async function setLocalStorageData(key, value) {
-        Spicetify.LocalStorage.set(key, value);
-    }
-
-    async function getSettings() {
+    function getSettings() {
         try {
-            const parsed = JSON.parse(await getLocalStorageData("starRatings:settings"));
+            const parsed = JSON.parse(api.getLocalStorageData("starRatings:settings"));
             if (parsed && typeof parsed === "object") {
                 return parsed;
             }
             throw "";
         } catch {
-            await setLocalStorageData("starRatings:settings", `{}`);
+            api.setLocalStorageData("starRatings:settings", `{}`);
             return {
                 halfStarRatings: true,
                 likeThreshold: "4.0",
@@ -35,8 +29,8 @@ async function main() {
         }
     }
 
-    async function saveSettings() {
-        await setLocalStorageData("starRatings:settings", JSON.stringify(SETTINGS));
+    function saveSettings() {
+        api.setLocalStorageData("starRatings:settings", JSON.stringify(SETTINGS));
     }
 
     const RATINGS = ["0.0", "0.5", "1.0", "1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"];
@@ -59,72 +53,6 @@ async function main() {
         });
     };
 
-    async function showNotification(text) {
-        Spicetify.showNotification(text);
-    }
-
-    async function createPlaylist(name, folderUri) {
-        if (navigator.platform.startsWith("Linux") && navigator.userAgent.includes("Spotify/1.1.84.716")) {
-            return await Spicetify.Platform.RootlistAPI.createPlaylist(name, {
-                after: folderUri,
-            });
-        } else {
-            return await Spicetify.Platform.RootlistAPI.createPlaylist(name, {
-                after: {
-                    uri: folderUri,
-                },
-            });
-        }
-    }
-
-    async function makePlaylistPrivate(playlistUri) {
-        setTimeout(async () => {
-            await Spicetify.CosmosAsync.post(`sp://core-playlist/v1/playlist/${playlistUri}/set-base-permission`, {
-                permission_level: "BLOCKED",
-            });
-        }, 1000);
-    }
-
-    async function createFolder(name) {
-        await Spicetify.Platform.RootlistAPI.createFolder(name, { before: "" });
-    }
-
-    async function getAlbum(albumId) {
-        return await Spicetify.CosmosAsync.get(`wg://album/v1/album-app/album/${albumId}/desktop`);
-    }
-
-    async function getPlaylists() {
-        return await Spicetify.Platform.RootlistAPI.getContents();
-    }
-
-    async function addTrackToPlaylist(playlistId, trackUri) {
-        try {
-            await Spicetify.CosmosAsync.post(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
-                uris: [trackUri],
-            });
-        } catch (error) {
-            await new Promise((resolve) => setTimeout(resolve, 500));
-            await Spicetify.CosmosAsync.post(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
-                uris: [trackUri],
-            });
-        }
-    }
-
-    async function deleteTrackFromPlaylist(playlistId, trackUri) {
-        await Spicetify.CosmosAsync.del(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
-            tracks: [
-                {
-                    uri: trackUri,
-                },
-            ],
-        });
-    }
-
-    async function getPlaylistItems(uri) {
-        const result = await Spicetify.CosmosAsync.get(`sp://core-playlist/v1/playlist/${uri}`);
-        return result.items;
-    }
-
     function filterRatedPlaylists(playlists) {
         const result = {};
         for (const playlist of playlists.items) {
@@ -135,7 +63,7 @@ async function main() {
     }
 
     async function getRatedPlaylists() {
-        let playlists = await getPlaylists();
+        let playlists = await api.getPlaylists();
         const rated = playlists.items.find((playlist) => playlist.type === "folder" && playlist.name === "Rated");
         if (!rated) {
             return [[], null];
@@ -148,7 +76,7 @@ async function main() {
         const [playlists, ratedFolder] = await getRatedPlaylists();
         const ratings = {};
         for (const rating in playlists) {
-            const items = await getPlaylistItems(playlists[rating].uri);
+            const items = await api.getPlaylistItems(playlists[rating].uri);
             for (const item of items) {
                 const uri = item.link;
                 if (!ratings[uri]) {
@@ -162,7 +90,7 @@ async function main() {
                     console.log(
                         `Removing track ${item.name} with lower rating ${lower} and higher rating ${higher} from lower rated playlist ${playlists[lower].name}.`
                     );
-                    await deleteTrackFromPlaylist(playlistUriToId(playlists[lower].uri), uri);
+                    await api.deleteTrackFromPlaylist(playlistUriToId(playlists[lower].uri), uri);
                 }
             }
         }
@@ -317,7 +245,7 @@ async function main() {
                             let state = !value;
                             SETTINGS[field] = state;
                             setValue(state);
-                            await saveSettings();
+                            saveSettings();
                             onclick();
                         },
                     },
@@ -356,7 +284,7 @@ async function main() {
                         onChange: async (e) => {
                             setValue(e.target.value);
                             SETTINGS[field] = e.target.value;
-                            await saveSettings();
+                            saveSettings();
                             onclick();
                         },
                     },
@@ -432,8 +360,8 @@ async function main() {
         return ["OTHER", null];
     }
 
-    SETTINGS = await getSettings();
-    await saveSettings();
+    SETTINGS = getSettings();
+    saveSettings();
 
     let oldTracklist = null;
     let tracklist = null;
@@ -460,7 +388,7 @@ async function main() {
         if (pageType !== "ALBUM") return;
         [playlists, ratedFolderUri, ratings] = await getRatings();
 
-        const album = await getAlbum(id);
+        const album = await api.getAlbum(id);
         const tracks = album.discs[0].tracks;
         let sumRatings = 0.0;
         let numRatings = 0;
@@ -522,9 +450,9 @@ async function main() {
             if (rating) {
                 const playlistUri = playlists[rating].uri;
                 const playlistId = playlistUriToId(playlistUri);
-                await deleteTrackFromPlaylist(playlistId, trackUri);
+                await api.deleteTrackFromPlaylist(playlistId, trackUri);
                 if (removeRating) {
-                    showNotification(`Removed from ${rating}`);
+                    api.showNotification(`Removed from ${rating}`);
                 }
             }
 
@@ -533,19 +461,19 @@ async function main() {
 
             if (!playlist && !removeRating) {
                 if (!ratedFolderUri) {
-                    await createFolder("Rated");
+                    await api.createFolder("Rated");
                     [playlists, ratedFolderUri] = await getRatedPlaylists();
                 }
-                playlistUri = await createPlaylist(ratingString, ratedFolderUri);
-                await makePlaylistPrivate(playlistUri);
+                playlistUri = await api.createPlaylist(ratingString, ratedFolderUri);
+                await api.makePlaylistPrivate(playlistUri);
                 [playlists, ratedFolderUri] = await getRatedPlaylists();
             }
 
             if (!removeRating) {
                 playlistUri = playlists[ratingString].uri;
                 const playlistId = playlistUriToId(playlistUri);
-                await addTrackToPlaylist(playlistId, trackUri);
-                showNotification((rating ? "Moved" : "Added") + ` to ${ratingString}`);
+                await api.addTrackToPlaylist(playlistId, trackUri);
+                api.showNotification((rating ? "Moved" : "Added") + ` to ${ratingString}`);
                 ratings[trackUri] = ratingString;
             } else {
                 delete ratings[trackUri];
@@ -565,140 +493,40 @@ async function main() {
         };
     }
 
+    const keys = {
+        "5.0": Spicetify.Keyboard.KEYS.NUMPAD_0,
+        "0.5": Spicetify.Keyboard.KEYS.NUMPAD_1,
+        "1.0": Spicetify.Keyboard.KEYS.NUMPAD_2,
+        "1.5": Spicetify.Keyboard.KEYS.NUMPAD_3,
+        "2.0": Spicetify.Keyboard.KEYS.NUMPAD_4,
+        "2.5": Spicetify.Keyboard.KEYS.NUMPAD_5,
+        "3.0": Spicetify.Keyboard.KEYS.NUMPAD_6,
+        "3.5": Spicetify.Keyboard.KEYS.NUMPAD_7,
+        "4.0": Spicetify.Keyboard.KEYS.NUMPAD_8,
+        "4.5": Spicetify.Keyboard.KEYS.NUMPAD_9,
+    };
+
     const registerKeyboardShortcuts = () => {
-        Spicetify.Keyboard.registerShortcut(
-            {
-                key: Spicetify.Keyboard.KEYS.NUMPAD_0,
-                ctrl: true,
-                alt: true,
-            },
-            getClickListener(4, "5.0", nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
-        );
-        Spicetify.Keyboard.registerShortcut(
-            {
-                key: Spicetify.Keyboard.KEYS.NUMPAD_1,
-                ctrl: true,
-                alt: true,
-            },
-            getClickListener(0, "0.5", nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
-        );
-        Spicetify.Keyboard.registerShortcut(
-            {
-                key: Spicetify.Keyboard.KEYS.NUMPAD_2,
-                ctrl: true,
-                alt: true,
-            },
-            getClickListener(0, "1.0", nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
-        );
-        Spicetify.Keyboard.registerShortcut(
-            {
-                key: Spicetify.Keyboard.KEYS.NUMPAD_3,
-                ctrl: true,
-                alt: true,
-            },
-            getClickListener(1, "1.5", nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
-        );
-        Spicetify.Keyboard.registerShortcut(
-            {
-                key: Spicetify.Keyboard.KEYS.NUMPAD_4,
-                ctrl: true,
-                alt: true,
-            },
-            getClickListener(1, "2.0", nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
-        );
-        Spicetify.Keyboard.registerShortcut(
-            {
-                key: Spicetify.Keyboard.KEYS.NUMPAD_5,
-                ctrl: true,
-                alt: true,
-            },
-            getClickListener(2, "2.5", nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
-        );
-        Spicetify.Keyboard.registerShortcut(
-            {
-                key: Spicetify.Keyboard.KEYS.NUMPAD_6,
-                ctrl: true,
-                alt: true,
-            },
-            getClickListener(2, "3.0", nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
-        );
-        Spicetify.Keyboard.registerShortcut(
-            {
-                key: Spicetify.Keyboard.KEYS.NUMPAD_7,
-                ctrl: true,
-                alt: true,
-            },
-            getClickListener(3, "3.5", nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
-        );
-        Spicetify.Keyboard.registerShortcut(
-            {
-                key: Spicetify.Keyboard.KEYS.NUMPAD_8,
-                ctrl: true,
-                alt: true,
-            },
-            getClickListener(3, "4.0", nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
-        );
-        Spicetify.Keyboard.registerShortcut(
-            {
-                key: Spicetify.Keyboard.KEYS.NUMPAD_9,
-                ctrl: true,
-                alt: true,
-            },
-            getClickListener(4, "4.5", nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
-        );
+        for (const [rating, key] of Object.entries(keys)) {
+            Spicetify.Keyboard.registerShortcut(
+                {
+                    key: key,
+                    ctrl: true,
+                    alt: true,
+                },
+                getClickListener(0, rating, nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
+            );
+        }
     };
 
     const deregisterKeyboardShortcuts = () => {
-        Spicetify.Keyboard._deregisterShortcut({
-            key: Spicetify.Keyboard.KEYS.NUMPAD_0,
-            ctrl: true,
-            alt: true,
-        });
-        Spicetify.Keyboard._deregisterShortcut({
-            key: Spicetify.Keyboard.KEYS.NUMPAD_1,
-            ctrl: true,
-            alt: true,
-        });
-        Spicetify.Keyboard._deregisterShortcut({
-            key: Spicetify.Keyboard.KEYS.NUMPAD_2,
-            ctrl: true,
-            alt: true,
-        });
-        Spicetify.Keyboard._deregisterShortcut({
-            key: Spicetify.Keyboard.KEYS.NUMPAD_3,
-            ctrl: true,
-            alt: true,
-        });
-        Spicetify.Keyboard._deregisterShortcut({
-            key: Spicetify.Keyboard.KEYS.NUMPAD_4,
-            ctrl: true,
-            alt: true,
-        });
-        Spicetify.Keyboard._deregisterShortcut({
-            key: Spicetify.Keyboard.KEYS.NUMPAD_5,
-            ctrl: true,
-            alt: true,
-        });
-        Spicetify.Keyboard._deregisterShortcut({
-            key: Spicetify.Keyboard.KEYS.NUMPAD_6,
-            ctrl: true,
-            alt: true,
-        });
-        Spicetify.Keyboard._deregisterShortcut({
-            key: Spicetify.Keyboard.KEYS.NUMPAD_7,
-            ctrl: true,
-            alt: true,
-        });
-        Spicetify.Keyboard._deregisterShortcut({
-            key: Spicetify.Keyboard.KEYS.NUMPAD_8,
-            ctrl: true,
-            alt: true,
-        });
-        Spicetify.Keyboard._deregisterShortcut({
-            key: Spicetify.Keyboard.KEYS.NUMPAD_9,
-            ctrl: true,
-            alt: true,
-        });
+        for (const key of Object.values(keys)) {
+            Spicetify.Keyboard._deregisterShortcut({
+                key: key,
+                ctrl: true,
+                alt: true,
+            });
+        }
     };
 
     function displaySettings() {
