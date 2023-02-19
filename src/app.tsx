@@ -1,5 +1,5 @@
 import * as api from "./api";
-import { createStars } from "./stars";
+import { createStars, setRating } from "./stars";
 import { loadSettings, saveSettings, getSetting, setSetting } from "./settings";
 import { displaySettings } from "./settings-ui";
 import { getRatings, getRatedPlaylists } from "./ratings";
@@ -44,26 +44,6 @@ async function main() {
             values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.uri ||
             values[0]?.pendingProps?.children[0]?.props?.children[0]?.props?.uri
         );
-    }
-
-    function setRating(starElements, rating) {
-        const halfStars = (rating /= 0.5);
-        for (let i = 0; i < 5; i++) {
-            const stopFirst = starElements[i][1];
-            const stopSecond = starElements[i][2];
-            stopFirst.setAttributeNS(null, "stop-color", "var(--spice-button-disabled)");
-            stopSecond.setAttributeNS(null, "stop-color", "var(--spice-button-disabled)");
-        }
-        for (let i = 0; i < halfStars; i++) {
-            const j = Math.floor(i / 2);
-            const stopFirst = starElements[j][1];
-            const stopSecond = starElements[j][2];
-            if (i % 2 === 0) {
-                stopFirst.setAttributeNS(null, "stop-color", "var(--spice-button)");
-            } else {
-                stopSecond.setAttributeNS(null, "stop-color", "var(--spice-button)");
-            }
-        }
     }
 
     function getMouseoverRating(star, i) {

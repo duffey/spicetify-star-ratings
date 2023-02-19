@@ -58,3 +58,23 @@ export function createStars(idSuffix, size) {
 
     return [stars, starElements];
 }
+
+export function setRating(starElements, rating) {
+    const halfStars = (rating /= 0.5);
+    for (let i = 0; i < 5; i++) {
+        const stopFirst = starElements[i][1];
+        const stopSecond = starElements[i][2];
+        stopFirst.setAttributeNS(null, "stop-color", "var(--spice-button-disabled)");
+        stopSecond.setAttributeNS(null, "stop-color", "var(--spice-button-disabled)");
+    }
+    for (let i = 0; i < halfStars; i++) {
+        const j = Math.floor(i / 2);
+        const stopFirst = starElements[j][1];
+        const stopSecond = starElements[j][2];
+        if (i % 2 === 0) {
+            stopFirst.setAttributeNS(null, "stop-color", "var(--spice-button)");
+        } else {
+            stopSecond.setAttributeNS(null, "stop-color", "var(--spice-button)");
+        }
+    }
+}
