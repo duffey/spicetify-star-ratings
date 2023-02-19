@@ -1,0 +1,15 @@
+README.md
+dist
+install.png
+manifest.json
+node_modules
+package-lock.json
+package.json
+screenshot.gif
+screenshot.png
+settings.png
+src/settings.json
+src/types
+starRatings.js
+tsconfig.json
+.prettierrc.json
