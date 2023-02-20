@@ -4,214 +4,265 @@ import { loadSettings, saveSettings, getSetting, setSetting } from "./settings";
 import { displaySettings } from "./settings-ui";
 import { getRatings, getRatedPlaylists } from "./ratings";
 
+const fiveColumnGridCss = "[index] 16px [first] 4fr [var1] 2fr [var2] 1fr [last] minmax(120px,1fr)";
+const sixColumnGridCss = "[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] 2fr [last] minmax(120px,1fr)";
+const sevenColumnGridCss = "[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var3] 2fr [last] minmax(120px,1fr)";
+
+let oldTracklist = null;
+let tracklist = null;
+
+let oldNowPlayingWidget = null;
+let nowPlayingWidget = null;
+
+let [playlists, ratedFolderUri, ratings] = [null, null, null];
+let [pageType, id] = [null, null];
+let updateNowPlayingWidget = null;
+let updateTracklist = null;
+let albumStarData = null;
+let nowPlayingWidgetStarData = null;
+let clickHandlerRunning = false;
+
+const waitForElement = (selector) => {
+    return new Promise((resolve) => {
+        if (document.querySelector(selector)) {
+            return resolve(document.querySelector(selector));
+        }
+        const observer = new MutationObserver(() => {
+            if (document.querySelector(selector)) {
+                observer.disconnect();
+                resolve(document.querySelector(selector));
+            }
+        });
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+        });
+    });
+};
+
+function getTracklistTrackUri(tracklistElement) {
+    let values = Object.values(tracklistElement);
+    if (!values) return null;
+
+    return (
+        values[0]?.pendingProps?.children[0]?.props?.children?.props?.uri ||
+        values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.uri ||
+        values[0]?.pendingProps?.children[0]?.props?.children[0]?.props?.uri
+    );
+}
+
+function getMouseoverRating(star, i) {
+    const rect = star.getBoundingClientRect();
+    const offset = event.clientX - rect.left;
+    const half = offset > 8 || !getSetting("halfStarRatings");
+    const zeroStars = i === 0 && offset < 3;
+    let rating = i + 1;
+    if (!half) rating -= 0.5;
+    if (zeroStars) {
+        rating -= getSetting("halfStarRatings") ? 0.5 : 1.0;
+    }
+    return rating.toFixed(1);
+}
+
+function getPageType() {
+    const pathname = Spicetify.Platform.History.location.pathname;
+    let matches = null;
+    if (pathname === "/collection/tracks") {
+        return ["LIKED_SONGS", null];
+    }
+    if ((matches = pathname.match(/playlist\/(.*)/))) {
+        return ["PLAYLIST", matches[1]];
+    }
+    if ((matches = pathname.match(/album\/(.*)/))) {
+        return ["ALBUM", matches[1]];
+    }
+    if ((matches = pathname.match(/artist\/([^/]*)$/))) {
+        return ["ARTIST", matches[1]];
+    }
+    if ((matches = pathname.match(/artist\/([^/]*)\/saved/))) {
+        return ["ARTIST_LIKED", matches[1]];
+    }
+    return ["OTHER", null];
+}
+
+function getNowPlayingHeart() {
+    return document.querySelector(".main-nowPlayingWidget-nowPlaying .control-button-heart");
+}
+
+function getNowPlayingTrackUri() {
+    return Spicetify.Player.data.track.uri;
+}
+
+async function updateAlbumRating() {
+    if (pageType !== "ALBUM") return;
+    //[playlists, ratedFolderUri, ratings] = await getRatings();
+
+    const album = await api.getAlbum(id);
+    const tracks = album.discs[0].tracks;
+    let sumRatings = 0.0;
+    let numRatings = 0;
+
+    for (const track of tracks) {
+        const rating = ratings[track.uri];
+        if (!rating) continue;
+        sumRatings += parseFloat(rating);
+        numRatings += 1;
+    }
+
+    let averageRating = 0.0;
+    if (numRatings > 0) averageRating = sumRatings / numRatings;
+    // Round to nearest 0.5
+    averageRating = (Math.round(averageRating * 2) / 2).toFixed(1);
+
+    const actionBar = await waitForElement(".main-actionBar-ActionBar");
+    const hasStars = actionBar.querySelector(".stars");
+    const playButton = actionBar.querySelector(".main-playButton-PlayButton");
+
+    if (!hasStars) {
+        albumStarData = createStars("album", 32);
+        playButton.after(albumStarData[0]);
+    }
+    setRating(albumStarData[1], averageRating.toString());
+}
+
+function getClickListener(i, ratingOverride, starData, getTrackUri, doUpdateNowPlayingWidget, doUpdateTracklist, getHeart) {
+    const getCurrentRating = (trackUri) => {
+        return ratings[trackUri] ? ratings[trackUri] : "0.0";
+    };
+
+    const [stars, starElements] = starData;
+    const star = starElements[i][0];
+
+    return async () => {
+        if (clickHandlerRunning) return;
+        clickHandlerRunning = true;
+        const trackUri = getTrackUri();
+        const currentRating = getCurrentRating(trackUri);
+        let newRating = ratingOverride !== null ? ratingOverride : getMouseoverRating(star, i);
+
+        const heart = getHeart();
+        if (heart && getSetting("likeThreshold") !== "disabled") {
+            if (heart.ariaChecked !== "true" && newRating >= parseFloat(getSetting("likeThreshold"))) heart.click();
+            if (heart.ariaChecked === "true" && newRating < parseFloat(getSetting("likeThreshold"))) heart.click();
+        }
+
+        const removeRating = currentRating === newRating && ratings[trackUri];
+        if (removeRating) {
+            newRating = "0.0";
+        }
+
+        const rating = ratings[trackUri];
+        const ratingString = newRating.toString();
+        // Do this first because otherwise the track mouseout event will set the track row to hidden again
+        ratings[trackUri] = ratingString;
+
+        setRating(starElements, newRating);
+
+        if (rating) {
+            const playlistUri = playlists[rating].uri;
+            await api.deleteTrackFromPlaylist(playlistUri, trackUri);
+            if (removeRating) {
+                api.showNotification(`Removed from ${rating}`);
+            }
+        }
+
+        const playlist = playlists[ratingString];
+        let playlistUri = null;
+
+        if (!playlist && !removeRating) {
+            if (!ratedFolderUri) {
+                await api.createFolder("Rated");
+                [playlists, ratedFolderUri] = await getRatedPlaylists();
+            }
+            playlistUri = await api.createPlaylist(ratingString, ratedFolderUri);
+            await api.makePlaylistPrivate(playlistUri);
+            [playlists, ratedFolderUri] = await getRatedPlaylists();
+        }
+
+        if (!removeRating) {
+            playlistUri = playlists[ratingString].uri;
+            await api.addTrackToPlaylist(playlistUri, trackUri);
+            api.showNotification((rating ? "Moved" : "Added") + ` to ${ratingString}`);
+            ratings[trackUri] = ratingString;
+        } else {
+            delete ratings[trackUri];
+        }
+
+        if (doUpdateNowPlayingWidget && updateNowPlayingWidget) {
+            updateNowPlayingWidget();
+        }
+
+        if (doUpdateTracklist && updateTracklist) {
+            const nowPlayingStars = document.getElementById(`stars-${trackUri}`);
+            if (nowPlayingStars) nowPlayingStars.remove();
+            await updateTracklist();
+        }
+
+        await updateAlbumRating();
+
+        clickHandlerRunning = false;
+    };
+}
+
+function registerKeyboardShortcuts(keys) {
+    return () => {
+        for (const [rating, key] of Object.entries(keys)) {
+            Spicetify.Keyboard.registerShortcut(
+                {
+                    key: key,
+                    ctrl: true,
+                    alt: true,
+                },
+                getClickListener(0, rating, nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
+            );
+        }
+    };
+}
+
+function deregisterKeyboardShortcuts(keys) {
+    return () => {
+        for (const key of Object.values(keys)) {
+            Spicetify.Keyboard._deregisterShortcut({
+                key: key,
+                ctrl: true,
+                alt: true,
+            });
+        }
+    };
+}
+
+function addStarsListeners(starData, getTrackUri, doUpdateNowPlayingWidget, doUpdateTracklist, getHeart) {
+    const getCurrentRating = (trackUri) => {
+        return ratings[trackUri] ? ratings[trackUri] : "0.0";
+    };
+
+    const [stars, starElements] = starData;
+
+    stars.addEventListener("mouseout", function () {
+        setRating(starElements, getCurrentRating(getTrackUri()));
+    });
+
+    for (let i = 0; i < 5; i++) {
+        const star = starElements[i][0];
+
+        star.addEventListener("mousemove", function () {
+            const rating = getMouseoverRating(star, i);
+            setRating(starElements, rating);
+        });
+
+        star.addEventListener("click", getClickListener(i, null, starData, getTrackUri, doUpdateNowPlayingWidget, doUpdateTracklist, getHeart));
+    }
+}
+
 async function main() {
     while (!Spicetify?.showNotification) {
         await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
-    const fiveColumnGridCss = "[index] 16px [first] 4fr [var1] 2fr [var2] 1fr [last] minmax(120px,1fr)";
-    const sixColumnGridCss = "[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] 2fr [last] minmax(120px,1fr)";
-    const sevenColumnGridCss = "[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var3] 2fr [last] minmax(120px,1fr)";
-
-    const waitForElement = (selector) => {
-        return new Promise((resolve) => {
-            if (document.querySelector(selector)) {
-                return resolve(document.querySelector(selector));
-            }
-            const observer = new MutationObserver(() => {
-                if (document.querySelector(selector)) {
-                    observer.disconnect();
-                    resolve(document.querySelector(selector));
-                }
-            });
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true,
-            });
-        });
-    };
-
-    function playlistUriToId(uri) {
-        return uri.match(/spotify:playlist:(.*)/)[1];
-    }
-
-    function getTracklistTrackUri(tracklistElement) {
-        let values = Object.values(tracklistElement);
-        if (!values) return null;
-
-        return (
-            values[0]?.pendingProps?.children[0]?.props?.children?.props?.uri ||
-            values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.uri ||
-            values[0]?.pendingProps?.children[0]?.props?.children[0]?.props?.uri
-        );
-    }
-
-    function getMouseoverRating(star, i) {
-        const rect = star.getBoundingClientRect();
-        const offset = event.clientX - rect.left;
-        const half = offset > 8 || !getSetting("halfStarRatings");
-        const zeroStars = i === 0 && offset < 3;
-        let rating = i + 1;
-        if (!half) rating -= 0.5;
-        if (zeroStars) {
-            rating -= getSetting("halfStarRatings") ? 0.5 : 1.0;
-        }
-        return rating.toFixed(1);
-    }
-
-    function getPageType() {
-        const pathname = Spicetify.Platform.History.location.pathname;
-        let matches = null;
-        if (pathname === "/collection/tracks") {
-            return ["LIKED_SONGS", null];
-        }
-        if ((matches = pathname.match(/playlist\/(.*)/))) {
-            return ["PLAYLIST", matches[1]];
-        }
-        if ((matches = pathname.match(/album\/(.*)/))) {
-            return ["ALBUM", matches[1]];
-        }
-        if ((matches = pathname.match(/artist\/([^/]*)$/))) {
-            return ["ARTIST", matches[1]];
-        }
-        if ((matches = pathname.match(/artist\/([^/]*)\/saved/))) {
-            return ["ARTIST_LIKED", matches[1]];
-        }
-        return ["OTHER", null];
-    }
-
     loadSettings();
     saveSettings();
 
-    let oldTracklist = null;
-    let tracklist = null;
-
-    let oldNowPlayingWidget = null;
-    let nowPlayingWidget = null;
-
-    let [playlists, ratedFolderUri, ratings] = await getRatings();
-    let [pageType, id] = [null, null];
-    let updateNowPlayingWidget = null;
-    let updateTracklist = null;
-    let albumStarData = null;
-    let nowPlayingWidgetStarData = null;
-
-    const getNowPlayingHeart = () => {
-        return document.querySelector(".main-nowPlayingWidget-nowPlaying .control-button-heart");
-    };
-
-    const getNowPlayingTrackUri = () => {
-        return Spicetify.Player.data.track.uri;
-    };
-
-    const updateAlbumRating = async () => {
-        if (pageType !== "ALBUM") return;
-        [playlists, ratedFolderUri, ratings] = await getRatings();
-
-        const album = await api.getAlbum(id);
-        const tracks = album.discs[0].tracks;
-        let sumRatings = 0.0;
-        let numRatings = 0;
-
-        for (const track of tracks) {
-            const rating = ratings[track.uri];
-            if (!rating) continue;
-            sumRatings += parseFloat(rating);
-            numRatings += 1;
-        }
-
-        let averageRating = 0.0;
-        if (numRatings > 0) averageRating = sumRatings / numRatings;
-        // Round to nearest 0.5
-        averageRating = (Math.round(averageRating * 2) / 2).toFixed(1);
-
-        const actionBar = await waitForElement(".main-actionBar-ActionBar");
-        const hasStars = actionBar.querySelector(".stars");
-        const playButton = actionBar.querySelector(".main-playButton-PlayButton");
-
-        if (!hasStars) {
-            albumStarData = createStars("album", 32);
-            playButton.after(albumStarData[0]);
-        }
-        setRating(albumStarData[1], averageRating.toString());
-    };
-
-    function getClickListener(i, ratingOverride, starData, getTrackUri, doUpdateNowPlayingWidget, doUpdateTracklist, getHeart) {
-        const getCurrentRating = (trackUri) => {
-            return ratings[trackUri] ? ratings[trackUri] : "0.0";
-        };
-
-        const [stars, starElements] = starData;
-        const star = starElements[i][0];
-
-        return async () => {
-            const trackUri = getTrackUri();
-            const currentRating = getCurrentRating(trackUri);
-            let newRating = ratingOverride !== null ? ratingOverride : getMouseoverRating(star, i);
-
-            const heart = getHeart();
-            if (heart && getSetting("likeThreshold") !== "disabled") {
-                if (heart.ariaChecked !== "true" && newRating >= parseFloat(getSetting("likeThreshold"))) heart.click();
-                if (heart.ariaChecked === "true" && newRating < parseFloat(getSetting("likeThreshold"))) heart.click();
-            }
-
-            const removeRating = currentRating === newRating && ratings[trackUri];
-            if (removeRating) {
-                newRating = "0.0";
-            }
-
-            const rating = ratings[trackUri];
-            const ratingString = newRating.toString();
-            // Do this first because otherwise the track mouseout event will set the track row to hidden again
-            ratings[trackUri] = ratingString;
-
-            setRating(starElements, newRating);
-
-            if (rating) {
-                const playlistUri = playlists[rating].uri;
-                const playlistId = playlistUriToId(playlistUri);
-                await api.deleteTrackFromPlaylist(playlistId, trackUri);
-                if (removeRating) {
-                    api.showNotification(`Removed from ${rating}`);
-                }
-            }
-
-            const playlist = playlists[ratingString];
-            let playlistUri = null;
-
-            if (!playlist && !removeRating) {
-                if (!ratedFolderUri) {
-                    await api.createFolder("Rated");
-                    [playlists, ratedFolderUri] = await getRatedPlaylists();
-                }
-                playlistUri = await api.createPlaylist(ratingString, ratedFolderUri);
-                await api.makePlaylistPrivate(playlistUri);
-                [playlists, ratedFolderUri] = await getRatedPlaylists();
-            }
-
-            if (!removeRating) {
-                playlistUri = playlists[ratingString].uri;
-                const playlistId = playlistUriToId(playlistUri);
-                await api.addTrackToPlaylist(playlistId, trackUri);
-                api.showNotification((rating ? "Moved" : "Added") + ` to ${ratingString}`);
-                ratings[trackUri] = ratingString;
-            } else {
-                delete ratings[trackUri];
-            }
-
-            if (doUpdateNowPlayingWidget && updateNowPlayingWidget) {
-                updateNowPlayingWidget();
-            }
-
-            if (doUpdateTracklist && updateTracklist) {
-                const nowPlayingStars = document.getElementById(`stars-${trackUri}`);
-                if (nowPlayingStars) nowPlayingStars.remove();
-                await updateTracklist();
-            }
-
-            await updateAlbumRating();
-        };
-    }
+    [playlists, ratedFolderUri, ratings] = await getRatings();
 
     const keys = {
         "5.0": Spicetify.Keyboard.KEYS.NUMPAD_0,
@@ -226,53 +277,7 @@ async function main() {
         "4.5": Spicetify.Keyboard.KEYS.NUMPAD_9,
     };
 
-    const registerKeyboardShortcuts = () => {
-        for (const [rating, key] of Object.entries(keys)) {
-            Spicetify.Keyboard.registerShortcut(
-                {
-                    key: key,
-                    ctrl: true,
-                    alt: true,
-                },
-                getClickListener(0, rating, nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
-            );
-        }
-    };
-
-    const deregisterKeyboardShortcuts = () => {
-        for (const key of Object.values(keys)) {
-            Spicetify.Keyboard._deregisterShortcut({
-                key: key,
-                ctrl: true,
-                alt: true,
-            });
-        }
-    };
-
-    new Spicetify.Menu.Item("Star Ratings", false, displaySettings(registerKeyboardShortcuts, deregisterKeyboardShortcuts)).register();
-
-    const addStarsListeners = (starData, getTrackUri, doUpdateNowPlayingWidget, doUpdateTracklist, getHeart) => {
-        const getCurrentRating = (trackUri) => {
-            return ratings[trackUri] ? ratings[trackUri] : "0.0";
-        };
-
-        const [stars, starElements] = starData;
-
-        stars.addEventListener("mouseout", function () {
-            setRating(starElements, getCurrentRating(getTrackUri()));
-        });
-
-        for (let i = 0; i < 5; i++) {
-            const star = starElements[i][0];
-
-            star.addEventListener("mouseover", function () {
-                const rating = getMouseoverRating(star, i);
-                setRating(starElements, rating);
-            });
-
-            star.addEventListener("click", getClickListener(i, null, starData, getTrackUri, doUpdateNowPlayingWidget, doUpdateTracklist, getHeart));
-        }
-    };
+    new Spicetify.Menu.Item("Star Ratings", false, displaySettings(registerKeyboardShortcuts(keys), deregisterKeyboardShortcuts(keys))).register();
 
     updateTracklist = () => {
         if (!getSetting("showPlaylistStars")) return;
@@ -402,7 +407,7 @@ async function main() {
                 tracklistObserver.disconnect();
             }
             [pageType, id] = getPageType();
-            [playlists, ratedFolderUri, ratings] = await getRatings();
+            //[playlists, ratedFolderUri, ratings] = await getRatings();
             updateTracklist();
             if (pageType === "ALBUM") await updateAlbumRating();
             tracklistObserver.observe(tracklist, {
@@ -424,7 +429,7 @@ async function main() {
             addStarsListeners(nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart);
             updateNowPlayingWidget();
             if (getSetting("enableKeyboardShortcuts")) {
-                registerKeyboardShortcuts();
+                registerKeyboardShortcuts(keys)();
             }
         }
     };

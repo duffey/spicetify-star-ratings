@@ -10,14 +10,17 @@ function filterRatedPlaylists(playlists) {
     return result;
 }
 
+function findRatedFolder(contents) {
+    return contents.items.find((item) => item.type === "folder" && item.name === "Rated");
+}
+
 export async function getRatedPlaylists() {
-    let playlists = await api.getPlaylists();
-    const rated = playlists.items.find((playlist) => playlist.type === "folder" && playlist.name === "Rated");
-    if (!rated) {
+    const contents = await api.getContents();
+    const ratedFolder = findRatedFolder(contents);
+    if (!ratedFolder) {
         return [[], null];
     }
-    playlists = rated;
-    return [filterRatedPlaylists(playlists), rated.uri];
+    return [filterRatedPlaylists(ratedFolder), ratedFolder.uri];
 }
 
 export async function getRatings() {
@@ -38,7 +41,7 @@ export async function getRatings() {
                 console.log(
                     `Removing track ${item.name} with lower rating ${lower} and higher rating ${higher} from lower rated playlist ${playlists[lower].name}.`
                 );
-                await api.deleteTrackFromPlaylist(playlistUriToId(playlists[lower].uri), uri);
+                await api.deleteTrackFromPlaylist(playlists[lower].uri, uri);
             }
         }
     }

@@ -40,11 +40,16 @@ export async function getAlbum(albumId) {
     return await Spicetify.CosmosAsync.get(`wg://album/v1/album-app/album/${albumId}/desktop`);
 }
 
-export async function getPlaylists() {
+export async function getContents() {
     return await Spicetify.Platform.RootlistAPI.getContents();
 }
 
-export async function addTrackToPlaylist(playlistId, trackUri) {
+function playlistUriToId(uri) {
+    return uri.match(/spotify:playlist:(.*)/)[1];
+}
+
+export async function addTrackToPlaylist(playlistUri, trackUri) {
+    const playlistId = playlistUriToId(playlistUri);
     try {
         await Spicetify.CosmosAsync.post(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
             uris: [trackUri],
@@ -57,7 +62,8 @@ export async function addTrackToPlaylist(playlistId, trackUri) {
     }
 }
 
-export async function deleteTrackFromPlaylist(playlistId, trackUri) {
+export async function deleteTrackFromPlaylist(playlistUri, trackUri) {
+    const playlistId = playlistUriToId(playlistUri);
     await Spicetify.CosmosAsync.del(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
         tracks: [
             {
