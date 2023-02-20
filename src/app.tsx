@@ -14,6 +14,9 @@ let tracklist = null;
 let oldNowPlayingWidget = null;
 let nowPlayingWidget = null;
 
+let oldAlbumPlayButton = null;
+let albumPlayButton = null;
+
 let [playlists, ratedFolderUri, ratings] = [null, null, null];
 let [pageType, id] = [null, null];
 let updateNowPlayingWidget = null;
@@ -21,24 +24,6 @@ let updateTracklist = null;
 let albumStarData = null;
 let nowPlayingWidgetStarData = null;
 let clickHandlerRunning = false;
-
-const waitForElement = (selector) => {
-    return new Promise((resolve) => {
-        if (document.querySelector(selector)) {
-            return resolve(document.querySelector(selector));
-        }
-        const observer = new MutationObserver(() => {
-            if (document.querySelector(selector)) {
-                observer.disconnect();
-                resolve(document.querySelector(selector));
-            }
-        });
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true,
-        });
-    });
-};
 
 function getTracklistTrackUri(tracklistElement) {
     let values = Object.values(tracklistElement);
@@ -64,25 +49,11 @@ function getMouseoverRating(star, i) {
     return rating.toFixed(1);
 }
 
-function getPageType() {
+function isAlbumPage() {
     const pathname = Spicetify.Platform.History.location.pathname;
-    let matches = null;
-    if (pathname === "/collection/tracks") {
-        return ["LIKED_SONGS", null];
-    }
-    if ((matches = pathname.match(/playlist\/(.*)/))) {
-        return ["PLAYLIST", matches[1]];
-    }
-    if ((matches = pathname.match(/album\/(.*)/))) {
-        return ["ALBUM", matches[1]];
-    }
-    if ((matches = pathname.match(/artist\/([^/]*)$/))) {
-        return ["ARTIST", matches[1]];
-    }
-    if ((matches = pathname.match(/artist\/([^/]*)\/saved/))) {
-        return ["ARTIST_LIKED", matches[1]];
-    }
-    return ["OTHER", null];
+    const matches = pathname.match(/album\/(.*)/);
+    if (!matches) return null;
+    return matches[1];
 }
 
 function getNowPlayingHeart() {
@@ -94,8 +65,7 @@ function getNowPlayingTrackUri() {
 }
 
 async function updateAlbumRating() {
-    if (pageType !== "ALBUM") return;
-    //[playlists, ratedFolderUri, ratings] = await getRatings();
+    if (!id) return;
 
     const album = await api.getAlbum(id);
     const tracks = album.discs[0].tracks;
@@ -114,14 +84,6 @@ async function updateAlbumRating() {
     // Round to nearest 0.5
     averageRating = (Math.round(averageRating * 2) / 2).toFixed(1);
 
-    const actionBar = await waitForElement(".main-actionBar-ActionBar");
-    const hasStars = actionBar.querySelector(".stars");
-    const playButton = actionBar.querySelector(".main-playButton-PlayButton");
-
-    if (!hasStars) {
-        albumStarData = createStars("album", 32);
-        playButton.after(albumStarData[0]);
-    }
     setRating(albumStarData[1], averageRating.toString());
 }
 
@@ -403,13 +365,11 @@ async function main() {
         oldTracklist = tracklist;
         tracklist = document.querySelector(".main-trackList-indexable");
         if (tracklist && !tracklist.isEqualNode(oldTracklist)) {
+            albumPlayButton = null;
             if (oldTracklist) {
                 tracklistObserver.disconnect();
             }
-            [pageType, id] = getPageType();
-            //[playlists, ratedFolderUri, ratings] = await getRatings();
             updateTracklist();
-            if (pageType === "ALBUM") await updateAlbumRating();
             tracklistObserver.observe(tracklist, {
                 childList: true,
                 subtree: true,
@@ -419,18 +379,27 @@ async function main() {
         if (getNowPlayingHeart()) getNowPlayingHeart().style.display = getSetting("hideHearts") ? "none" : "flex";
 
         oldNowPlayingWidget = nowPlayingWidget;
-        nowPlayingWidget = document.querySelector(".main-nowPlayingWidget-nowPlaying");
+        nowPlayingWidget = document.querySelector(".main-nowPlayingWidget-nowPlaying .main-trackInfo-container");
         if (nowPlayingWidget && !nowPlayingWidget.isEqualNode(oldNowPlayingWidget)) {
             nowPlayingWidgetStarData = createStars("now-playing", 16);
             nowPlayingWidgetStarData[0].style.marginLeft = "8px";
             nowPlayingWidgetStarData[0].style.marginRight = "8px";
-            const trackInfo = await waitForElement(".main-nowPlayingWidget-nowPlaying .main-trackInfo-container");
-            trackInfo.after(nowPlayingWidgetStarData[0]);
+            nowPlayingWidget.after(nowPlayingWidgetStarData[0]);
             addStarsListeners(nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart);
             updateNowPlayingWidget();
             if (getSetting("enableKeyboardShortcuts")) {
                 registerKeyboardShortcuts(keys)();
             }
+        }
+
+        oldAlbumPlayButton = albumPlayButton;
+        albumPlayButton = document.querySelector(".main-actionBar-ActionBar .main-playButton-PlayButton");
+        if (albumPlayButton && !albumPlayButton.isEqualNode(oldAlbumPlayButton)) {
+            id = isAlbumPage();
+            if (!id) return;
+            albumStarData = createStars("album", 32);
+            albumPlayButton.after(albumStarData[0]);
+            updateAlbumRating();
         }
     };
     const observer = new MutationObserver(observerCallback);
