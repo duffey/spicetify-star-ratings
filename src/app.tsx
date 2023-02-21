@@ -1,8 +1,8 @@
 import * as api from "./api";
-import { createStars, setRating } from "./stars";
+import { createStars, setRating, getMouseoverRating } from "./stars";
 import { loadSettings, saveSettings, getSetting, setSetting } from "./settings";
 import { displaySettings } from "./settings-ui";
-import { getRatings, getRatedPlaylists } from "./ratings";
+import { getRatings, getRatedPlaylists, getAlbumRating } from "./ratings";
 
 const fiveColumnGridCss = "[index] 16px [first] 4fr [var1] 2fr [var2] 1fr [last] minmax(120px,1fr)";
 const sixColumnGridCss = "[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] 2fr [last] minmax(120px,1fr)";
@@ -19,6 +19,7 @@ let albumPlayButton = null;
 
 let [playlists, ratedFolderUri, ratings] = [null, null, null];
 let [pageType, id] = [null, null];
+let album = null;
 let updateNowPlayingWidget = null;
 let updateTracklist = null;
 let albumStarData = null;
@@ -34,19 +35,6 @@ function getTracklistTrackUri(tracklistElement) {
         values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.uri ||
         values[0]?.pendingProps?.children[0]?.props?.children[0]?.props?.uri
     );
-}
-
-function getMouseoverRating(star, i) {
-    const rect = star.getBoundingClientRect();
-    const offset = event.clientX - rect.left;
-    const half = offset > 8 || !getSetting("halfStarRatings");
-    const zeroStars = i === 0 && offset < 3;
-    let rating = i + 1;
-    if (!half) rating -= 0.5;
-    if (zeroStars) {
-        rating -= getSetting("halfStarRatings") ? 0.5 : 1.0;
-    }
-    return rating.toFixed(1);
 }
 
 function isAlbumPage() {
@@ -65,26 +53,9 @@ function getNowPlayingTrackUri() {
 }
 
 async function updateAlbumRating() {
-    if (!id) return;
-
-    const album = await api.getAlbum(id);
-    const tracks = album.discs[0].tracks;
-    let sumRatings = 0.0;
-    let numRatings = 0;
-
-    for (const track of tracks) {
-        const rating = ratings[track.uri];
-        if (!rating) continue;
-        sumRatings += parseFloat(rating);
-        numRatings += 1;
-    }
-
-    let averageRating = 0.0;
-    if (numRatings > 0) averageRating = sumRatings / numRatings;
-    // Round to nearest 0.5
-    averageRating = (Math.round(averageRating * 2) / 2).toFixed(1);
-
-    setRating(albumStarData[1], averageRating.toString());
+    if (!album) return;
+    const albumRating = getAlbumRating(ratings, album);
+    setRating(albumStarData[1], albumRating.toString());
 }
 
 function getClickListener(i, ratingOverride, starData, getTrackUri, doUpdateNowPlayingWidget, doUpdateTracklist, getHeart) {
@@ -366,6 +337,7 @@ async function main() {
         tracklist = document.querySelector(".main-trackList-indexable");
         if (tracklist && !tracklist.isEqualNode(oldTracklist)) {
             albumPlayButton = null;
+            album = null;
             if (oldTracklist) {
                 tracklistObserver.disconnect();
             }
@@ -397,6 +369,7 @@ async function main() {
         if (albumPlayButton && !albumPlayButton.isEqualNode(oldAlbumPlayButton)) {
             id = isAlbumPage();
             if (!id) return;
+            album = await api.getAlbum(id);
             albumStarData = createStars("album", 32);
             albumPlayButton.after(albumStarData[0]);
             updateAlbumRating();

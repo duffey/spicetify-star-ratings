@@ -1,3 +1,5 @@
+import { getSetting } from "./settings";
+
 function createStar(starsId, n, size) {
     const xmlns = "http://www.w3.org/2000/svg";
     const star = document.createElementNS(xmlns, "svg");
@@ -77,4 +79,17 @@ export function setRating(starElements, rating) {
             stopSecond.setAttributeNS(null, "stop-color", "var(--spice-button)");
         }
     }
+}
+
+export function getMouseoverRating(star, i) {
+    const rect = star.getBoundingClientRect();
+    const offset = event.clientX - rect.left;
+    const half = offset > 8 || !getSetting("halfStarRatings");
+    const zeroStars = i === 0 && offset < 3;
+    let rating = i + 1;
+    if (!half) rating -= 0.5;
+    if (zeroStars) {
+        rating -= getSetting("halfStarRatings") ? 0.5 : 1.0;
+    }
+    return rating.toFixed(1);
 }

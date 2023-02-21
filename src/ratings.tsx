@@ -47,3 +47,23 @@ export async function getRatings() {
     }
     return [playlists, ratedFolder, ratings];
 }
+
+export function getAlbumRating(ratings, album) {
+    const tracks = album.discs[0].tracks;
+    let sumRatings = 0.0;
+    let numRatings = 0;
+
+    for (const track of tracks) {
+        const rating = ratings[track.uri];
+        if (!rating) continue;
+        sumRatings += parseFloat(rating);
+        numRatings += 1;
+    }
+
+    let averageRating = 0.0;
+    if (numRatings > 0) averageRating = sumRatings / numRatings;
+    // Round to nearest 0.5
+    averageRating = (Math.round(averageRating * 2) / 2).toFixed(1);
+
+    return averageRating;
+}
