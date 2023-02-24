@@ -118,7 +118,7 @@ function getRegisterKeyboardShortcuts(keys) {
                     alt: true,
                 },
                 () => {
-                    handleStarsClick(getNowPlayingTrackUri(), parseFloat(rating));
+                    handleStarsClick(getNowPlayingTrackUri(), parseFloat(rating), getNowPlayingHeart());
                 }
             );
         }
