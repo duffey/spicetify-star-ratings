@@ -9,7 +9,6 @@ export interface SettingsState {
         hideHearts: boolean;
         enableKeyboardShortcuts: boolean;
         showPlaylistStars: true;
-        playlistUris: Record<string, string>;
     };
 }
 
@@ -20,12 +19,14 @@ function initialState(): SettingsState {
         hideHearts: false,
         enableKeyboardShortcuts: true,
         showPlaylistStars: true,
-        playlistUris: {},
     };
     let settings = {};
 
-    const parsed = JSON.parse(api.getLocalStorageData("starRatings:settings"));
-    if (parsed && typeof parsed === "object") settings = parsed;
+    const localStorageData = api.getLocalStorageData("starRatings:settings");
+    if (localStorageData) {
+        settings = JSON.parse(localStorageData);
+    }
+
     let setDefault = false;
     for (const [setting, defaultValue] of Object.entries(defaultSettings))
         if (!settings.hasOwnProperty(setting)) {

@@ -4,17 +4,39 @@ export function findRatedFolder(contents) {
     return contents.items.find((item) => item.type === "folder" && item.name === "Rated");
 }
 
-export function addPlaylistUris(playlistUris, ratedFolder) {
+// Remove playlist URIs from settings when they no longer exist
+export function removePlaylistUris(playlistUris, ratedFolder) {
     const newPlaylistUris = {};
+    let changed = false;
+    for (const [rating, playlistUri] of Object.entries(playlistUris)) {
+        if (ratedFolder.items.find((item) => item.uri === playlistUri)) newPlaylistUris[rating] = playlistUri;
+        else changed = true;
+    }
+    return [changed, newPlaylistUris];
+}
+
+// Add playlist URIs of numbered rated playlists when they currently don't exist in settings
+export function addPlaylistUris(playlistUris, ratedFolder) {
+    const newPlaylistUris = { ...playlistUris };
+    let changed = false;
     const ratings = ["0.0", "0.5", "1.0", "1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"];
-    const unmappedRatings = ratings.filter((rating) => !playlistUris[rating]);
-    ratedFolder.items.filter((item) => unmappedRatings.includes(item.name)).forEach((item) => (newPlaylistUris[item.name] = item.uri));
-    return newPlaylistUris;
+    const unmappedRatings = ratings.filter((rating) => !playlistUris.hasOwnProperty(rating));
+    ratedFolder.items
+        .filter((item) => unmappedRatings.includes(item.name))
+        .forEach((item) => {
+            newPlaylistUris[item.name] = item.uri;
+            changed = true;
+        });
+    return [changed, newPlaylistUris];
 }
 
 export function getPlaylistNames(playlistUris, ratedFolder) {
     const playlistNames = {};
-    ratedFolder.items.filter((item) => playlistUris[item.name]).forEach((item) => (playlistNames[item.uri] = item.name));
+    ratedFolder.items
+        .filter((item) => Object.values(playlistUris).includes(item.uri))
+        .forEach((item) => {
+            playlistNames[item.uri] = item.name;
+        });
     return playlistNames;
 }
 

@@ -8,6 +8,7 @@ import { Provider } from "react-redux";
 import {
     findRatedFolder,
     addPlaylistUris,
+    removePlaylistUris,
     getAllPlaylistItems,
     getRatings,
     takeHighestRatings,
@@ -15,14 +16,13 @@ import {
     createRatedFolder,
     deleteLowestRatings,
 } from "./ratings";
-import { initRatings, setRating, removeRating } from "./ratings-slice";
+import { initRatings, setRating, removeRating, setPlaylistName } from "./ratings-slice";
 import { mouseoverTrack, mouseoutTrack } from "./mouseover-track-slice";
 import { setNowPlayingTrack } from "./now-playing-track-slice";
 import { setSetting } from "./settings-slice";
+import { initPlaylistUris, setPlaylistUri } from "./playlist-uris-slice";
 
 let ratedFolder = null;
-let playlistUris = {};
-let playlistNames = {};
 
 let tracklistObserver = null;
 
@@ -49,8 +49,8 @@ function getNowPlayingTrackUri() {
 
 async function handleRemoveRating(trackUri, rating) {
     const ratingAsString = rating.toFixed(1);
-    const playlistUri = playlistUris[ratingAsString];
-    const playlistName = playlistNames[playlistUri];
+    const playlistUri = store.getState().playlistUris.playlistUris[ratingAsString];
+    const playlistName = store.getState().ratings.playlistNames[playlistUri];
     await api.deleteTrackFromPlaylist(playlistUri, trackUri);
     api.showNotification(`Removed from ${playlistName}`);
 }
@@ -58,7 +58,7 @@ async function handleRemoveRating(trackUri, rating) {
 async function handleSetRating(trackUri, oldRating, newRating) {
     if (oldRating) {
         const oldRatingAsString = oldRating.toFixed(1);
-        const playlistUri = playlistUris[oldRatingAsString];
+        const playlistUri = store.getState().playlistUris.playlistUris[oldRatingAsString];
         await api.deleteTrackFromPlaylist(playlistUri, trackUri);
     }
 
@@ -69,16 +69,16 @@ async function handleSetRating(trackUri, oldRating, newRating) {
     }
 
     const newRatingAsString = newRating.toFixed(1);
-    let playlistUri = playlistUris[newRatingAsString];
+    let playlistUri = store.getState().playlistUris.playlistUris[newRatingAsString];
     if (!playlistUri) {
         playlistUri = await api.createPlaylist(newRatingAsString, ratedFolder.uri);
         await api.makePlaylistPrivate(playlistUri);
-        playlistUris[newRatingAsString] = playlistUri;
-        playlistNames[playlistUri] = newRatingAsString;
+        store.dispatch(setPlaylistUri({ rating: newRatingAsString, playlistUri: playlistUri }));
+        store.dispatch(setPlaylistName({ playlistUri: playlistUri, playlistName: newRatingAsString }));
     }
 
     await api.addTrackToPlaylist(playlistUri, trackUri);
-    const playlistName = playlistNames[playlistUri];
+    const playlistName = store.getState().ratings.playlistNames[playlistUri];
     api.showNotification((oldRating ? "Moved" : "Added") + ` to ${playlistName}`);
 }
 
@@ -325,17 +325,28 @@ async function main() {
     const contents = await api.getContents();
     ratedFolder = findRatedFolder(contents);
     let ratings = {};
+    let playlistNames = {};
 
+    let playlistUris = store.getState().playlistUris.playlistUris;
     if (ratedFolder) {
-        playlistUris = addPlaylistUris({}, ratedFolder);
+        let playlistUrisAdded = false;
+        [playlistUrisAdded, playlistUris] = addPlaylistUris(playlistUris, ratedFolder);
+
+        let playlistUrisRemoved = false;
+        [playlistUrisRemoved, playlistUris] = removePlaylistUris(playlistUris, ratedFolder);
+
+        if (playlistUrisAdded || playlistUrisRemoved) store.dispatch(initPlaylistUris(playlistUris));
+
         const allPlaylistItems = await getAllPlaylistItems(playlistUris);
         ratings = getRatings(allPlaylistItems);
         await deleteLowestRatings(playlistUris, ratings);
         ratings = takeHighestRatings(ratings);
         playlistNames = getPlaylistNames(playlistUris, ratedFolder);
+    } else if (Object.keys(playlistUris).length > 0) {
+        store.dispatch(initPlaylistUris({}));
     }
 
-    store.dispatch(initRatings(ratings));
+    store.dispatch(initRatings({ ratings: ratings, playlistNames: playlistNames }));
 
     const keys = {
         "5.0": Spicetify.Keyboard.KEYS.NUMPAD_0,

@@ -3,6 +3,7 @@ import ratingsReducer from "./ratings-slice";
 import mouseoverTrackReducer from "./mouseover-track-slice";
 import nowPlayingTrackReducer from "./now-playing-track-slice";
 import settingsReducer from "./settings-slice";
+import playlistUrisReducer from "./playlist-uris-slice";
 
 export const store = configureStore({
     reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
         mouseoverTrack: mouseoverTrackReducer,
         nowPlayingTrack: nowPlayingTrackReducer,
         settings: settingsReducer,
+        playlistUris: playlistUrisReducer,
     },
 });
 
