@@ -9,6 +9,7 @@ export interface SettingsState {
         hideHearts: boolean;
         enableKeyboardShortcuts: boolean;
         showPlaylistStars: true;
+        playlistUris: Record<string, string>;
     };
 }
 
@@ -19,6 +20,7 @@ function initialState(): SettingsState {
         hideHearts: false,
         enableKeyboardShortcuts: true,
         showPlaylistStars: true,
+        playlistUris: {},
     };
     let settings = {};
 

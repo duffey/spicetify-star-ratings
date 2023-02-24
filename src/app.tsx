@@ -27,6 +27,8 @@ let tracklistObserver = null;
 
 let oldTracklist = null;
 let tracklist = null;
+let originalTracklistHeaderCss = null;
+let originalTracklistTrackCss = null;
 
 let oldNowPlayingWidget = null;
 let nowPlayingWidget = null;
@@ -135,8 +137,36 @@ function getDeregisterKeyboardShortcuts(keys) {
     };
 }
 
+function restoreTracklist() {
+    const restoreTracklistHeader = () => {
+        if (!tracklist) return;
+        const tracklistHeader = document.querySelector(".main-trackList-trackListHeaderRow");
+        if (!tracklistHeader) return;
+        if (!originalTracklistHeaderCss) return;
+        tracklistHeader.style["grid-template-columns"] = originalTracklistHeaderCss;
+    };
+
+    const restoreTracklistTracks = () => {
+        if (!tracklist) return;
+        if (!originalTracklistTrackCss) return;
+        const tracks = tracklist.getElementsByClassName("main-trackList-trackListRow");
+        for (const track of tracks) {
+            let ratingColumn = track.querySelector(".star-ratings");
+            if (!ratingColumn) continue;
+            const lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
+            const colIndexAsInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+            lastColumn.setAttribute("aria-colindex", (colIndexAsInt - 1).toString());
+            track.style["grid-template-columns"] = originalTracklistTrackCss;
+            ratingColumn.remove();
+        }
+    };
+
+    restoreTracklistHeader();
+    restoreTracklistTracks();
+}
+
 function updateTracklist() {
-    //if (!getSetting("showPlaylistStars")) return;
+    if (!store.getState().settings.settings.showPlaylistStars) return;
 
     const tracklistColumnCss = [
         null,
@@ -154,7 +184,12 @@ function updateTracklist() {
         const lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
         const colIndexAsInt = parseInt(lastColumn.getAttribute("aria-colindex"));
 
-        if (tracklistColumnCss[colIndexAsInt]) tracklistHeader.style["grid-template-columns"] = tracklistColumnCss[colIndexAsInt];
+        if (tracklistColumnCss[colIndexAsInt]) {
+            if (!originalTracklistHeaderCss) {
+                originalTracklistHeaderCss = getComputedStyle(tracklistHeader).getPropertyValue("grid-template-columns");
+            }
+            tracklistHeader.style["grid-template-columns"] = tracklistColumnCss[colIndexAsInt];
+        }
     }
 
     const tracks = tracklist.getElementsByClassName("main-trackList-trackListRow");
@@ -193,7 +228,12 @@ function updateTracklist() {
             ratingColumn.classList.add("star-ratings");
             track.insertBefore(ratingColumn, lastColumn);
 
-            if (tracklistColumnCss[colIndexAsInt]) track.style["grid-template-columns"] = tracklistColumnCss[colIndexAsInt];
+            if (tracklistColumnCss[colIndexAsInt]) {
+                if (!originalTracklistTrackCss) {
+                    originalTracklistTrackCss = getComputedStyle(track).getPropertyValue("grid-template-columns");
+                }
+                track.style["grid-template-columns"] = tracklistColumnCss[colIndexAsInt];
+            }
         }
 
         if (!heart || !trackUri || hasStars || !isTrack) continue;
@@ -224,14 +264,14 @@ async function globalObserverCallback() {
         if (oldTracklist) {
             tracklistObserver.disconnect();
         }
+        originalTracklistHeaderCss = null;
+        originalTracklistTrackCss = null;
         updateTracklist();
         tracklistObserver.observe(tracklist, {
             childList: true,
             subtree: true,
         });
     }
-
-    //if (getNowPlayingHeart()) getNowPlayingHeart().style.display = getSetting("hideHearts") ? "none" : "flex";
 
     oldNowPlayingWidget = nowPlayingWidget;
     nowPlayingWidget = document.querySelector(".main-nowPlayingWidget-nowPlaying .main-trackInfo-container");
@@ -281,8 +321,6 @@ async function main() {
         await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
-    console.log("init!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-
     const contents = await api.getContents();
     ratedFolder = findRatedFolder(contents);
     let ratings = {};
@@ -317,7 +355,7 @@ async function main() {
     new Spicetify.Menu.Item("Star Ratings", false, () => {
         Spicetify.PopupModal.display({
             title: "Star Ratings",
-            content: Settings({ registerKeyboardShortcuts, deregisterKeyboardShortcuts }),
+            content: Settings({ registerKeyboardShortcuts, deregisterKeyboardShortcuts, updateTracklist, restoreTracklist }),
             isLarge: true,
         });
     }).register();

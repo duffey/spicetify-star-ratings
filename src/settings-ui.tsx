@@ -81,7 +81,7 @@ function Heading({ value }) {
     return <h2 className="Type__TypeElement-goli3j-0 bcTfIx main-keyboardShortcutsHelpModal-sectionHeading">{value}</h2>;
 }
 
-export function Settings({ registerKeyboardShortcuts, deregisterKeyboardShortcuts }) {
+export function Settings({ registerKeyboardShortcuts, deregisterKeyboardShortcuts, updateTracklist, restoreTracklist }) {
     function handleHideHeartsCheckboxClick(hideHearts) {
         const nowPlayingWidgetHeart = document.querySelector(".control-button-heart");
         if (nowPlayingWidgetHeart) nowPlayingWidgetHeart.style.display = hideHearts ? "none" : "flex";
@@ -92,6 +92,11 @@ export function Settings({ registerKeyboardShortcuts, deregisterKeyboardShortcut
     function handleEnableKeyboardShortcutsCheckboxClick(enableKeyboardShortcuts) {
         if (enableKeyboardShortcuts) registerKeyboardShortcuts();
         else deregisterKeyboardShortcuts();
+    }
+
+    function handleShowPlaylistStarsCheckboxClick(showPlaylistStars) {
+        if (showPlaylistStars) updateTracklist();
+        else restoreTracklist();
     }
 
     return (
@@ -105,7 +110,7 @@ export function Settings({ registerKeyboardShortcuts, deregisterKeyboardShortcut
                     field="enableKeyboardShortcuts"
                     onCheckboxClick={handleEnableKeyboardShortcutsCheckboxClick}
                 />
-                <CheckboxItem name="Show playlist stars" field="showPlaylistStars" />
+                <CheckboxItem name="Show playlist stars" field="showPlaylistStars" onCheckboxClick={handleShowPlaylistStarsCheckboxClick} />
                 <DropdownItem
                     name="Auto-like/dislike threshold"
                     field="likeThreshold"
