@@ -48,13 +48,13 @@ export function takeHighestRatings(ratings) {
 
 export async function deleteLowestRatings(playlistUris, ratings) {
     const promises = [];
-    for (const [trackUri, trackRatings] of ratings) {
+    for (const [trackUri, trackRatings] of Object.entries(ratings)) {
         if (trackRatings.length <= 1) continue;
         const highestRating = Math.max(...trackRatings);
         trackRatings
             .filter((rating) => rating != highestRating)
             .forEach((rating) => {
-                const playlistUri = playlistUris.get(rating);
+                const playlistUri = playlistUris[rating];
                 console.log(
                     `Removing track ${trackUri} with lower rating ${rating} and higher rating ${highestRating} from lower rated playlist ${playlistUri}.`
                 );

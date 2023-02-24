@@ -13,6 +13,7 @@ import {
     takeHighestRatings,
     getPlaylistNames,
     createRatedFolder,
+    deleteLowestRatings,
 } from "./ratings";
 import { initRatings, setRating, removeRating } from "./ratings-slice";
 import { mouseoverTrack, mouseoutTrack } from "./mouseover-track-slice";
@@ -329,6 +330,7 @@ async function main() {
         playlistUris = addPlaylistUris({}, ratedFolder);
         const allPlaylistItems = await getAllPlaylistItems(playlistUris);
         ratings = getRatings(allPlaylistItems);
+        await deleteLowestRatings(playlistUris, ratings);
         ratings = takeHighestRatings(ratings);
         playlistNames = getPlaylistNames(playlistUris, ratedFolder);
     }
