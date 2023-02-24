@@ -1,6 +1,6 @@
-# Spotify Star Ratings
+# Spicetify Star Ratings
 
-Rate songs with stars and have them automatically added to playlists.
+Add star ratings to Spotify.
 
 ![Screenshot](screenshot.gif)
 
@@ -14,7 +14,3 @@ Rate songs with stars and have them automatically added to playlists.
 
 Settings, such as enabling/disabling half star ratings, can be accessed from the menu at the top right
 ![Settings](settings.png)
-
-## Credits
-
-Thanks to [Tetrax-10](https://github.com/Tetrax-10) for the settings UI code

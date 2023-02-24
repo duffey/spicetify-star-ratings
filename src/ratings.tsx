@@ -1,69 +1,86 @@
 import * as api from "./api";
 
-function filterRatedPlaylists(playlists) {
-    const RATINGS = ["0.0", "0.5", "1.0", "1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"];
-    const result = {};
-    for (const playlist of playlists.items) {
-        if (!RATINGS.includes(playlist.name)) continue;
-        result[playlist.name] = playlist;
-    }
-    return result;
-}
-
-function findRatedFolder(contents) {
+export function findRatedFolder(contents) {
     return contents.items.find((item) => item.type === "folder" && item.name === "Rated");
 }
 
-export async function getRatedPlaylists() {
-    const contents = await api.getContents();
-    const ratedFolder = findRatedFolder(contents);
-    if (!ratedFolder) {
-        return [[], null];
-    }
-    return [filterRatedPlaylists(ratedFolder), ratedFolder.uri];
+export function addPlaylistUris(playlistUris, ratedFolder) {
+    const newPlaylistUris = {};
+    const ratings = ["0.0", "0.5", "1.0", "1.5", "2.0", "2.5", "3.0", "3.5", "4.0", "4.5", "5.0"];
+    const unmappedRatings = ratings.filter((rating) => !playlistUris[rating]);
+    ratedFolder.items.filter((item) => unmappedRatings.includes(item.name)).forEach((item) => (newPlaylistUris[item.name] = item.uri));
+    return newPlaylistUris;
 }
 
-export async function getRatings() {
-    const [playlists, ratedFolder] = await getRatedPlaylists();
+export function getPlaylistNames(playlistUris, ratedFolder) {
+    const playlistNames = {};
+    ratedFolder.items.filter((item) => playlistUris[item.name]).forEach((item) => (playlistNames[item.uri] = item.name));
+    return playlistNames;
+}
+
+export async function getAllPlaylistItems(playlistUris) {
+    const ratings = Object.keys(playlistUris);
+    const allPlaylistItemsArray = await Promise.all(ratings.map((rating) => api.getPlaylistItems(playlistUris[rating])));
+    const allPlaylistItems = {};
+    for (let i = 0; i < ratings.length; i++) allPlaylistItems[ratings[i]] = allPlaylistItemsArray[i];
+    return allPlaylistItems;
+}
+
+export function getRatings(allPlaylistItems) {
     const ratings = {};
-    for (const rating in playlists) {
-        const items = await api.getPlaylistItems(playlists[rating].uri);
+    for (const [rating, items] of Object.entries(allPlaylistItems)) {
         for (const item of items) {
-            const uri = item.link;
-            if (!ratings[uri]) {
-                ratings[uri] = rating;
-            } else {
-                const m = parseFloat(rating);
-                const n = parseFloat(ratings[uri]);
-                const lower = m < n ? rating : ratings[uri];
-                const higher = m > n ? rating : ratings[uri];
-                ratings[uri] = higher;
-                console.log(
-                    `Removing track ${item.name} with lower rating ${lower} and higher rating ${higher} from lower rated playlist ${playlists[lower].name}.`
-                );
-                await api.deleteTrackFromPlaylist(playlists[lower].uri, uri);
-            }
+            const trackUri = item.link;
+            let trackRatings = [];
+            if (ratings[trackUri]) trackRatings = ratings[trackUri];
+            trackRatings.push(rating);
+            ratings[trackUri] = trackRatings;
         }
     }
-    return [playlists, ratedFolder, ratings];
+    return ratings;
+}
+
+export function takeHighestRatings(ratings) {
+    const newRatings = {};
+    for (const [trackUri, trackRatings] of Object.entries(ratings)) newRatings[trackUri] = Math.max(...trackRatings);
+    return newRatings;
+}
+
+export async function deleteLowestRatings(playlistUris, ratings) {
+    const promises = [];
+    for (const [trackUri, trackRatings] of ratings) {
+        if (trackRatings.length <= 1) continue;
+        const highestRating = Math.max(...trackRatings);
+        trackRatings
+            .filter((rating) => rating != highestRating)
+            .forEach((rating) => {
+                const playlistUri = playlistUris.get(rating);
+                console.log(
+                    `Removing track ${trackUri} with lower rating ${rating} and higher rating ${highestRating} from lower rated playlist ${playlistUri}.`
+                );
+                promises.push(api.deleteTrackFromPlaylist(playlistUri, trackUri));
+            });
+    }
+    await Promise.all(promises);
+}
+
+export async function createRatedFolder() {
+    await api.createFolder("Rated");
 }
 
 export function getAlbumRating(ratings, album) {
     const tracks = album.discs[0].tracks;
     let sumRatings = 0.0;
     let numRatings = 0;
-
     for (const track of tracks) {
         const rating = ratings[track.uri];
         if (!rating) continue;
         sumRatings += parseFloat(rating);
         numRatings += 1;
     }
-
     let averageRating = 0.0;
     if (numRatings > 0) averageRating = sumRatings / numRatings;
     // Round to nearest 0.5
     averageRating = (Math.round(averageRating * 2) / 2).toFixed(1);
-
     return averageRating;
 }

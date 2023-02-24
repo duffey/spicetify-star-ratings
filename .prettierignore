@@ -8,6 +8,7 @@ package.json
 screenshot.gif
 screenshot.png
 settings.png
+settings-ui.css
 src/settings.json
 src/types
 starRatings.js

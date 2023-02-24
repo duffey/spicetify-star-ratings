@@ -44,12 +44,12 @@ export async function getContents() {
     return await Spicetify.Platform.RootlistAPI.getContents();
 }
 
-function playlistUriToId(uri) {
+function playlistUriToPlaylistId(uri) {
     return uri.match(/spotify:playlist:(.*)/)[1];
 }
 
 export async function addTrackToPlaylist(playlistUri, trackUri) {
-    const playlistId = playlistUriToId(playlistUri);
+    const playlistId = playlistUriToPlaylistId(playlistUri);
     try {
         await Spicetify.CosmosAsync.post(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
             uris: [trackUri],
@@ -63,7 +63,7 @@ export async function addTrackToPlaylist(playlistUri, trackUri) {
 }
 
 export async function deleteTrackFromPlaylist(playlistUri, trackUri) {
-    const playlistId = playlistUriToId(playlistUri);
+    const playlistId = playlistUriToPlaylistId(playlistUri);
     await Spicetify.CosmosAsync.del(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
         tracks: [
             {

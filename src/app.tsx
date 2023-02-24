@@ -1,12 +1,29 @@
+import React from "react";
+import ReactDOM from "react-dom";
 import * as api from "./api";
-import { createStars, setRating, getMouseoverRating } from "./stars";
-import { loadSettings, saveSettings, getSetting, setSetting } from "./settings";
-import { displaySettings } from "./settings-ui";
-import { getRatings, getRatedPlaylists, getAlbumRating } from "./ratings";
+import { TracklistStars, NowPlayingStars, AlbumStars } from "./stars";
+import { Settings } from "./settings-ui";
+import { store } from "./store";
+import { Provider } from "react-redux";
+import {
+    findRatedFolder,
+    addPlaylistUris,
+    getAllPlaylistItems,
+    getRatings,
+    takeHighestRatings,
+    getPlaylistNames,
+    createRatedFolder,
+} from "./ratings";
+import { initRatings, setRating, removeRating } from "./ratings-slice";
+import { mouseoverTrack, mouseoutTrack } from "./mouseover-track-slice";
+import { setNowPlayingTrack } from "./now-playing-track-slice";
+import { setSetting } from "./settings-slice";
 
-const fiveColumnGridCss = "[index] 16px [first] 4fr [var1] 2fr [var2] 1fr [last] minmax(120px,1fr)";
-const sixColumnGridCss = "[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] 2fr [last] minmax(120px,1fr)";
-const sevenColumnGridCss = "[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var3] 2fr [last] minmax(120px,1fr)";
+let ratedFolder = null;
+let playlistUris = {};
+let playlistNames = {};
+
+let tracklistObserver = null;
 
 let oldTracklist = null;
 let tracklist = null;
@@ -17,32 +34,7 @@ let nowPlayingWidget = null;
 let oldAlbumPlayButton = null;
 let albumPlayButton = null;
 
-let [playlists, ratedFolderUri, ratings] = [null, null, null];
-let [pageType, id] = [null, null];
-let album = null;
-let updateNowPlayingWidget = null;
-let updateTracklist = null;
-let albumStarData = null;
-let nowPlayingWidgetStarData = null;
-let clickHandlerRunning = false;
-
-function getTracklistTrackUri(tracklistElement) {
-    let values = Object.values(tracklistElement);
-    if (!values) return null;
-
-    return (
-        values[0]?.pendingProps?.children[0]?.props?.children?.props?.uri ||
-        values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.uri ||
-        values[0]?.pendingProps?.children[0]?.props?.children[0]?.props?.uri
-    );
-}
-
-function isAlbumPage() {
-    const pathname = Spicetify.Platform.History.location.pathname;
-    const matches = pathname.match(/album\/(.*)/);
-    if (!matches) return null;
-    return matches[1];
-}
+let handleStarsClickRunning = false;
 
 function getNowPlayingHeart() {
     return document.querySelector(".main-nowPlayingWidget-nowPlaying .control-button-heart");
@@ -52,92 +44,69 @@ function getNowPlayingTrackUri() {
     return Spicetify.Player.data.track.uri;
 }
 
-async function updateAlbumRating() {
-    if (!album) return;
-    const albumRating = getAlbumRating(ratings, album);
-    setRating(albumStarData[1], albumRating.toString());
+async function handleRemoveRating(trackUri, rating) {
+    const ratingAsString = rating.toFixed(1);
+    const playlistUri = playlistUris[ratingAsString];
+    const playlistName = playlistNames[playlistUri];
+    await api.deleteTrackFromPlaylist(playlistUri, trackUri);
+    api.showNotification(`Removed from ${playlistName}`);
 }
 
-function getClickListener(i, ratingOverride, starData, getTrackUri, doUpdateNowPlayingWidget, doUpdateTracklist, getHeart) {
-    const getCurrentRating = (trackUri) => {
-        return ratings[trackUri] ? ratings[trackUri] : "0.0";
-    };
+async function handleSetRating(trackUri, oldRating, newRating) {
+    if (oldRating) {
+        const oldRatingAsString = oldRating.toFixed(1);
+        const playlistUri = playlistUris[oldRatingAsString];
+        await api.deleteTrackFromPlaylist(playlistUri, trackUri);
+    }
 
-    const [stars, starElements] = starData;
-    const star = starElements[i][0];
+    if (!ratedFolder) {
+        await createRatedFolder();
+        const contents = await api.getContents();
+        ratedFolder = findRatedFolder(contents);
+    }
 
-    return async () => {
-        if (clickHandlerRunning) return;
-        clickHandlerRunning = true;
-        const trackUri = getTrackUri();
-        const currentRating = getCurrentRating(trackUri);
-        let newRating = ratingOverride !== null ? ratingOverride : getMouseoverRating(star, i);
+    const newRatingAsString = newRating.toFixed(1);
+    let playlistUri = playlistUris[newRatingAsString];
+    if (!playlistUri) {
+        playlistUri = await api.createPlaylist(newRatingAsString, ratedFolder.uri);
+        await api.makePlaylistPrivate(playlistUri);
+        playlistUris[newRatingAsString] = playlistUri;
+        playlistNames[playlistUri] = newRatingAsString;
+    }
 
-        const heart = getHeart();
-        if (heart && getSetting("likeThreshold") !== "disabled") {
-            if (heart.ariaChecked !== "true" && newRating >= parseFloat(getSetting("likeThreshold"))) heart.click();
-            if (heart.ariaChecked === "true" && newRating < parseFloat(getSetting("likeThreshold"))) heart.click();
-        }
-
-        const removeRating = currentRating === newRating && ratings[trackUri];
-        if (removeRating) {
-            newRating = "0.0";
-        }
-
-        const rating = ratings[trackUri];
-        const ratingString = newRating.toString();
-        // Do this first because otherwise the track mouseout event will set the track row to hidden again
-        ratings[trackUri] = ratingString;
-
-        setRating(starElements, newRating);
-
-        if (rating) {
-            const playlistUri = playlists[rating].uri;
-            await api.deleteTrackFromPlaylist(playlistUri, trackUri);
-            if (removeRating) {
-                api.showNotification(`Removed from ${rating}`);
-            }
-        }
-
-        const playlist = playlists[ratingString];
-        let playlistUri = null;
-
-        if (!playlist && !removeRating) {
-            if (!ratedFolderUri) {
-                await api.createFolder("Rated");
-                [playlists, ratedFolderUri] = await getRatedPlaylists();
-            }
-            playlistUri = await api.createPlaylist(ratingString, ratedFolderUri);
-            await api.makePlaylistPrivate(playlistUri);
-            [playlists, ratedFolderUri] = await getRatedPlaylists();
-        }
-
-        if (!removeRating) {
-            playlistUri = playlists[ratingString].uri;
-            await api.addTrackToPlaylist(playlistUri, trackUri);
-            api.showNotification((rating ? "Moved" : "Added") + ` to ${ratingString}`);
-            ratings[trackUri] = ratingString;
-        } else {
-            delete ratings[trackUri];
-        }
-
-        if (doUpdateNowPlayingWidget && updateNowPlayingWidget) {
-            updateNowPlayingWidget();
-        }
-
-        if (doUpdateTracklist && updateTracklist) {
-            const nowPlayingStars = document.getElementById(`stars-${trackUri}`);
-            if (nowPlayingStars) nowPlayingStars.remove();
-            await updateTracklist();
-        }
-
-        await updateAlbumRating();
-
-        clickHandlerRunning = false;
-    };
+    await api.addTrackToPlaylist(playlistUri, trackUri);
+    const playlistName = playlistNames[playlistUri];
+    api.showNotification((oldRating ? "Moved" : "Added") + ` to ${playlistName}`);
 }
 
-function registerKeyboardShortcuts(keys) {
+function handleStarsClick(trackUri, newRating, heart) {
+    if (handleStarsClickRunning) return;
+    handleStarsClickRunning = true;
+
+    const likeThreshold = store.getState().settings.settings.likeThreshold;
+    if (likeThreshold !== "disabled") {
+        const likeThresholdAsFloat = parseFloat(likeThreshold);
+        if (heart.ariaChecked !== "true" && newRating >= likeThresholdAsFloat) heart.click();
+        if (heart.ariaChecked === "true" && newRating < likeThresholdAsFloat) heart.click();
+    }
+
+    const ratings = store.getState().ratings.ratings;
+    const oldRating = ratings[trackUri];
+
+    if (oldRating == newRating) {
+        store.dispatch(removeRating(trackUri));
+        handleRemoveRating(trackUri, oldRating).finally(() => {
+            handleStarsClickRunning = false;
+        });
+    } else {
+        store.dispatch(setRating({ trackUri: trackUri, rating: newRating }));
+        handleSetRating(trackUri, oldRating, newRating).finally(() => {
+            handleStarsClickRunning = false;
+        });
+    }
+}
+
+function getRegisterKeyboardShortcuts(keys) {
     return () => {
         for (const [rating, key] of Object.entries(keys)) {
             Spicetify.Keyboard.registerShortcut(
@@ -146,13 +115,15 @@ function registerKeyboardShortcuts(keys) {
                     ctrl: true,
                     alt: true,
                 },
-                getClickListener(0, rating, nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart)
+                () => {
+                    handleStarsClick(getNowPlayingTrackUri(), parseFloat(rating));
+                }
             );
         }
     };
 }
 
-function deregisterKeyboardShortcuts(keys) {
+function getDeregisterKeyboardShortcuts(keys) {
     return () => {
         for (const key of Object.values(keys)) {
             Spicetify.Keyboard._deregisterShortcut({
@@ -164,26 +135,144 @@ function deregisterKeyboardShortcuts(keys) {
     };
 }
 
-function addStarsListeners(starData, getTrackUri, doUpdateNowPlayingWidget, doUpdateTracklist, getHeart) {
-    const getCurrentRating = (trackUri) => {
-        return ratings[trackUri] ? ratings[trackUri] : "0.0";
-    };
+function updateTracklist() {
+    //if (!getSetting("showPlaylistStars")) return;
 
-    const [stars, starElements] = starData;
+    const tracklistColumnCss = [
+        null,
+        null,
+        null,
+        null,
+        "[index] 16px [first] 4fr [var1] 2fr [var2] 1fr [last] minmax(120px,1fr)",
+        "[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] 2fr [last] minmax(120px,1fr)",
+        "[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var3] 2fr [last] minmax(120px,1fr)",
+    ];
 
-    stars.addEventListener("mouseout", function () {
-        setRating(starElements, getCurrentRating(getTrackUri()));
-    });
+    const tracklistHeader = document.querySelector(".main-trackList-trackListHeaderRow");
+    // No tracklist header on Artist page
+    if (tracklistHeader) {
+        const lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
+        const colIndexAsInt = parseInt(lastColumn.getAttribute("aria-colindex"));
 
-    for (let i = 0; i < 5; i++) {
-        const star = starElements[i][0];
+        if (tracklistColumnCss[colIndexAsInt]) tracklistHeader.style["grid-template-columns"] = tracklistColumnCss[colIndexAsInt];
+    }
 
-        star.addEventListener("mousemove", function () {
-            const rating = getMouseoverRating(star, i);
-            setRating(starElements, rating);
+    const tracks = tracklist.getElementsByClassName("main-trackList-trackListRow");
+
+    for (const track of tracks) {
+        const getHeart = () => {
+            return track.getElementsByClassName("main-addButton-button")[0];
+        };
+        const heart = track.getElementsByClassName("main-addButton-button")[0];
+        const hasStars = track.getElementsByClassName("stars").length > 0;
+
+        const getTracklistTrackUri = (tracklistElement) => {
+            let values = Object.values(tracklistElement);
+            if (!values) return null;
+
+            return (
+                values[0]?.pendingProps?.children[0]?.props?.children?.props?.uri ||
+                values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.uri ||
+                values[0]?.pendingProps?.children[0]?.props?.children[0]?.props?.uri
+            );
+        };
+
+        const trackUri = getTracklistTrackUri(track);
+        const isTrack = trackUri.includes("track");
+        let ratingColumn = track.querySelector(".star-ratings");
+
+        if (!ratingColumn) {
+            const lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
+            const colIndexAsInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+            lastColumn.setAttribute("aria-colindex", (colIndexAsInt + 1).toString());
+            ratingColumn = document.createElement("div");
+            ratingColumn.setAttribute("aria-colindex", colIndexAsInt.toString());
+            ratingColumn.role = "gridcell";
+            ratingColumn.style.display = "flex";
+            ratingColumn.classList.add("main-trackList-rowSectionVariable");
+            ratingColumn.classList.add("star-ratings");
+            track.insertBefore(ratingColumn, lastColumn);
+
+            if (tracklistColumnCss[colIndexAsInt]) track.style["grid-template-columns"] = tracklistColumnCss[colIndexAsInt];
+        }
+
+        if (!heart || !trackUri || hasStars || !isTrack) continue;
+
+        ReactDOM.render(
+            <Provider store={store}>
+                <TracklistStars trackUri={trackUri} heart={heart} onStarsClick={handleStarsClick} />
+            </Provider>,
+            ratingColumn
+        );
+
+        heart.style.display = store.getState().settings.settings.hideHearts ? "none" : "flex";
+
+        track.addEventListener("mouseover", () => {
+            store.dispatch(mouseoverTrack(trackUri));
         });
 
-        star.addEventListener("click", getClickListener(i, null, starData, getTrackUri, doUpdateNowPlayingWidget, doUpdateTracklist, getHeart));
+        track.addEventListener("mouseout", () => {
+            store.dispatch(mouseoutTrack(trackUri));
+        });
+    }
+}
+
+async function globalObserverCallback() {
+    oldTracklist = tracklist;
+    tracklist = document.querySelector(".main-trackList-indexable");
+    if (tracklist && !tracklist.isEqualNode(oldTracklist)) {
+        if (oldTracklist) {
+            tracklistObserver.disconnect();
+        }
+        updateTracklist();
+        tracklistObserver.observe(tracklist, {
+            childList: true,
+            subtree: true,
+        });
+    }
+
+    //if (getNowPlayingHeart()) getNowPlayingHeart().style.display = getSetting("hideHearts") ? "none" : "flex";
+
+    oldNowPlayingWidget = nowPlayingWidget;
+    nowPlayingWidget = document.querySelector(".main-nowPlayingWidget-nowPlaying .main-trackInfo-container");
+    if (nowPlayingWidget && !nowPlayingWidget.isEqualNode(oldNowPlayingWidget)) {
+        store.dispatch(setNowPlayingTrack(getNowPlayingTrackUri()));
+
+        const span = document.createElement("span");
+        nowPlayingWidget.after(span);
+
+        ReactDOM.render(
+            <Provider store={store}>
+                <NowPlayingStars getHeart={getNowPlayingHeart} onStarsClick={handleStarsClick} />
+            </Provider>,
+            span
+        );
+    }
+
+    oldAlbumPlayButton = albumPlayButton;
+    albumPlayButton = document.querySelector(".main-actionBar-ActionBar .main-playButton-PlayButton");
+    if (albumPlayButton && !albumPlayButton.isEqualNode(oldAlbumPlayButton)) {
+        const isAlbumPage = () => {
+            const pathname = Spicetify.Platform.History.location.pathname;
+            const matches = pathname.match(/album\/(.*)/);
+            if (!matches) return null;
+            return matches[1];
+        };
+
+        const albumId = isAlbumPage();
+        if (!albumId) return;
+
+        const album = await api.getAlbum(albumId);
+
+        const span = document.createElement("span");
+        albumPlayButton.after(span);
+
+        ReactDOM.render(
+            <Provider store={store}>
+                <AlbumStars album={album} />
+            </Provider>,
+            span
+        );
     }
 }
 
@@ -192,10 +281,21 @@ async function main() {
         await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
-    loadSettings();
-    saveSettings();
+    console.log("init!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 
-    [playlists, ratedFolderUri, ratings] = await getRatings();
+    const contents = await api.getContents();
+    ratedFolder = findRatedFolder(contents);
+    let ratings = {};
+
+    if (ratedFolder) {
+        playlistUris = addPlaylistUris({}, ratedFolder);
+        const allPlaylistItems = await getAllPlaylistItems(playlistUris);
+        ratings = getRatings(allPlaylistItems);
+        ratings = takeHighestRatings(ratings);
+        playlistNames = getPlaylistNames(playlistUris, ratedFolder);
+    }
+
+    store.dispatch(initRatings(ratings));
 
     const keys = {
         "5.0": Spicetify.Keyboard.KEYS.NUMPAD_0,
@@ -209,175 +309,30 @@ async function main() {
         "4.0": Spicetify.Keyboard.KEYS.NUMPAD_8,
         "4.5": Spicetify.Keyboard.KEYS.NUMPAD_9,
     };
+    const registerKeyboardShortcuts = getRegisterKeyboardShortcuts(keys);
+    const deregisterKeyboardShortcuts = getDeregisterKeyboardShortcuts(keys);
 
-    new Spicetify.Menu.Item("Star Ratings", false, displaySettings(registerKeyboardShortcuts(keys), deregisterKeyboardShortcuts(keys))).register();
+    if (store.getState().settings.settings.enableKeyboardShortcuts) registerKeyboardShortcuts();
 
-    updateTracklist = () => {
-        if (!getSetting("showPlaylistStars")) return;
-        const tracklist_ = document.querySelector(".main-trackList-indexable");
-        if (!tracklist_) return;
-        const tracks = tracklist_.getElementsByClassName("main-trackList-trackListRow");
+    new Spicetify.Menu.Item("Star Ratings", false, () => {
+        Spicetify.PopupModal.display({
+            title: "Star Ratings",
+            content: Settings({ registerKeyboardShortcuts, deregisterKeyboardShortcuts }),
+            isLarge: true,
+        });
+    }).register();
 
-        const tracklistHeader = document.querySelector(".main-trackList-trackListHeaderRow");
-        // No tracklist header on Artist page
-        if (tracklistHeader) {
-            let lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
-            let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+    Spicetify.Player.addEventListener("songchange", () => {
+        store.dispatch(setNowPlayingTrack(getNowPlayingTrackUri()));
+    });
 
-            switch (colIndexInt) {
-                case 4:
-                    tracklistHeader.style["grid-template-columns"] = fiveColumnGridCss;
-                    break;
-                case 5:
-                    tracklistHeader.style["grid-template-columns"] = sixColumnGridCss;
-                    break;
-                case 6:
-                    tracklistHeader.style["grid-template-columns"] = sevenColumnGridCss;
-                    break;
-                default:
-                    break;
-            }
-        }
-
-        for (const track of tracks) {
-            const getHeart = () => {
-                return track.getElementsByClassName("main-addButton-button")[0];
-            };
-            const heart = track.getElementsByClassName("main-addButton-button")[0];
-            const hasStars = track.getElementsByClassName("stars").length > 0;
-            const trackUri = getTracklistTrackUri(track);
-            const isTrack = trackUri.includes("track");
-
-            let ratingColumn = track.querySelector(".starRatings");
-            if (!ratingColumn) {
-                // Add column for stars
-                let lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
-                let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
-                lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
-                ratingColumn = document.createElement("div");
-                ratingColumn.setAttribute("aria-colindex", colIndexInt.toString());
-                ratingColumn.role = "gridcell";
-                ratingColumn.style.display = "flex";
-                ratingColumn.classList.add("main-trackList-rowSectionVariable");
-                ratingColumn.classList.add("starRatings");
-                track.insertBefore(ratingColumn, lastColumn);
-
-                switch (colIndexInt) {
-                    case 4:
-                        track.style["grid-template-columns"] = fiveColumnGridCss;
-                        break;
-                    case 5:
-                        track.style["grid-template-columns"] = sixColumnGridCss;
-                        break;
-                    case 6:
-                        track.style["grid-template-columns"] = sevenColumnGridCss;
-                        break;
-                    default:
-                        break;
-                }
-            }
-
-            if (!heart || !trackUri || hasStars || !isTrack) continue;
-
-            const starData = createStars(trackUri, 16);
-            const stars = starData[0];
-            const starElements = starData[1];
-            const currentRating = ratings[trackUri] ? ratings[trackUri] : "0.0";
-            ratingColumn.appendChild(stars);
-            setRating(starElements, currentRating);
-            getHeart().style.display = getSetting("hideHearts") ? "none" : "flex";
-            addStarsListeners(
-                starData,
-                () => {
-                    return trackUri;
-                },
-                true,
-                false,
-                getHeart
-            );
-
-            // Add listeners for hovering over a track in the tracklist
-            stars.style.visibility = ratings[trackUri] ? "visible" : "hidden";
-
-            track.addEventListener("mouseover", () => {
-                stars.style.visibility = "visible";
-            });
-
-            track.addEventListener("mouseout", () => {
-                stars.style.visibility = ratings[trackUri] ? "visible" : "hidden";
-            });
-        }
-    };
-
-    updateNowPlayingWidget = () => {
-        if (!nowPlayingWidgetStarData) return;
-
-        const getTrackUri = () => {
-            return Spicetify.Player.data.track.uri;
-        };
-        const trackUri = getTrackUri();
-        const isTrack = trackUri.includes("track");
-
-        nowPlayingWidgetStarData[0].style.display = isTrack ? "flex" : "none";
-
-        const currentRating = ratings[trackUri] ? ratings[trackUri] : "0.0";
-        setRating(nowPlayingWidgetStarData[1], currentRating);
-    };
-
-    const tracklistObserver = new MutationObserver(() => {
+    tracklistObserver = new MutationObserver(() => {
         updateTracklist();
     });
 
-    Spicetify.Player.addEventListener("songchange", () => {
-        updateNowPlayingWidget();
-    });
-
-    const observerCallback = async () => {
-        oldTracklist = tracklist;
-        tracklist = document.querySelector(".main-trackList-indexable");
-        if (tracklist && !tracklist.isEqualNode(oldTracklist)) {
-            albumPlayButton = null;
-            album = null;
-            if (oldTracklist) {
-                tracklistObserver.disconnect();
-            }
-            updateTracklist();
-            tracklistObserver.observe(tracklist, {
-                childList: true,
-                subtree: true,
-            });
-        }
-
-        if (getNowPlayingHeart()) getNowPlayingHeart().style.display = getSetting("hideHearts") ? "none" : "flex";
-
-        oldNowPlayingWidget = nowPlayingWidget;
-        nowPlayingWidget = document.querySelector(".main-nowPlayingWidget-nowPlaying .main-trackInfo-container");
-        if (nowPlayingWidget && !nowPlayingWidget.isEqualNode(oldNowPlayingWidget)) {
-            nowPlayingWidgetStarData = createStars("now-playing", 16);
-            nowPlayingWidgetStarData[0].style.marginLeft = "8px";
-            nowPlayingWidgetStarData[0].style.marginRight = "8px";
-            nowPlayingWidget.after(nowPlayingWidgetStarData[0]);
-            addStarsListeners(nowPlayingWidgetStarData, getNowPlayingTrackUri, false, true, getNowPlayingHeart);
-            updateNowPlayingWidget();
-            if (getSetting("enableKeyboardShortcuts")) {
-                registerKeyboardShortcuts(keys)();
-            }
-        }
-
-        oldAlbumPlayButton = albumPlayButton;
-        albumPlayButton = document.querySelector(".main-actionBar-ActionBar .main-playButton-PlayButton");
-        if (albumPlayButton && !albumPlayButton.isEqualNode(oldAlbumPlayButton)) {
-            id = isAlbumPage();
-            if (!id) return;
-            album = await api.getAlbum(id);
-            albumStarData = createStars("album", 32);
-            albumPlayButton.after(albumStarData[0]);
-            updateAlbumRating();
-        }
-    };
-    const observer = new MutationObserver(observerCallback);
-    await observerCallback();
-    observer.observe(document.body, {
+    const globalObserver = new MutationObserver(globalObserverCallback);
+    await globalObserverCallback();
+    globalObserver.observe(document.body, {
         childList: true,
         subtree: true,
     });
