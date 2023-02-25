@@ -1,8 +1,8 @@
 # Spicetify Star Ratings
 
-Add star ratings to Spotify.
+Add star ratings to Spotify
 
-![Screenshot](screenshot.gif)
+![Screenshot](screenshot.png)
 
 ## Install
 

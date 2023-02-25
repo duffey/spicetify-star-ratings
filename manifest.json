@@ -1,7 +1,7 @@
 {
   "name": "Star Ratings",
-  "description": "Add star ratings to Spotify.",
-  "preview": "screenshot.png",
+  "description": "Add star ratings to Spotify",
+  "preview": "preview.png",
   "main": "dist/star-ratings.js",
   "readme": "README.md",
   "authors": [
