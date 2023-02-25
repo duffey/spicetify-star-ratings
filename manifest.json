@@ -1,8 +1,8 @@
 {
   "name": "Star Ratings",
-  "description": "Rate songs with stars and automatically save them to playlists.",
+  "description": "Add star ratings to Spotify.",
   "preview": "screenshot.png",
-  "main": "starRatings.js",
+  "main": "dist/star-ratings.js",
   "readme": "README.md",
   "authors": [
       { "name": "Scott Duffey", "url": "https://github.com/duffey" }
