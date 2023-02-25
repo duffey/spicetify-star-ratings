@@ -13,7 +13,7 @@ function initialState(): PlaylistUrisState {
     if (localStorageData) {
         playlistUris = JSON.parse(localStorageData);
     } else {
-        api.setLocalStorageData("starRatings:playlistURis", JSON.stringify(playlistUris));
+        api.setLocalStorageData("starRatings:playlistUris", JSON.stringify(playlistUris));
     }
 
     return {
