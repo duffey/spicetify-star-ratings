@@ -329,11 +329,11 @@ async function main() {
 
     let playlistUris = store.getState().playlistUris.playlistUris;
     if (ratedFolder) {
-        let playlistUrisAdded = false;
-        [playlistUrisAdded, playlistUris] = addPlaylistUris(playlistUris, ratedFolder);
-
         let playlistUrisRemoved = false;
         [playlistUrisRemoved, playlistUris] = removePlaylistUris(playlistUris, ratedFolder);
+
+        let playlistUrisAdded = false;
+        [playlistUrisAdded, playlistUris] = addPlaylistUris(playlistUris, ratedFolder);
 
         if (playlistUrisAdded || playlistUrisRemoved) store.dispatch(initPlaylistUris(playlistUris));
 
