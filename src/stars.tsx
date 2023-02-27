@@ -1,198 +1,93 @@
-import React from "react";
-import { useState } from "react";
-import type { RootState } from "./store";
-import { useSelector } from "react-redux";
-import { getAlbumRating } from "./ratings";
+function createStar(starsId, n, size) {
+    const xmlns = "http://www.w3.org/2000/svg";
+    const star = document.createElementNS(xmlns, "svg");
+    const id = `${starsId}-${n}`;
+    star.id = id;
+    star.style.minHeight = `${size}px`;
+    star.style.minWidth = `${size}px`;
+    star.setAttributeNS(null, "width", `${size}px`);
+    star.setAttributeNS(null, "height", `${size}px`);
+    star.setAttributeNS(null, "viewBox", `0 0 32 32`);
 
-export function Star({ i, id, fillFirstHalf, fillSecondHalf, size, onStarMouseMove, onStarClick }) {
-    const halfStarRatings = useSelector((state: RootState) => state.settings.settings.halfStarRatings);
+    const defs = document.createElementNS(xmlns, "defs");
+    star.append(defs);
 
-    function getMouseOverRating(event) {
-        const rect = event.target.getBoundingClientRect();
-        const offset = event.clientX - rect.left;
-        const half = offset > 8 || !halfStarRatings;
-        const zeroStars = i === 0 && offset < 3;
-        let rating = i + 1;
-        if (!half) rating -= 0.5;
-        if (zeroStars) {
-            rating -= halfStarRatings ? 0.5 : 1.0;
+    const gradient = document.createElementNS(xmlns, "linearGradient");
+    defs.append(gradient);
+    gradient.id = `${id}-gradient`;
+
+    const stopFirst = document.createElementNS(xmlns, "stop");
+    gradient.append(stopFirst);
+    stopFirst.id = `${id}-gradient-first`;
+    stopFirst.setAttributeNS(null, "offset", "50%");
+    stopFirst.setAttributeNS(null, "stop-color", "var(--spice-button-disabled)");
+
+    const stopSecond = document.createElementNS(xmlns, "stop");
+    gradient.append(stopSecond);
+    stopSecond.id = `${id}-gradient-second`;
+    stopSecond.setAttributeNS(null, "offset", "50%");
+    stopSecond.setAttributeNS(null, "stop-color", "var(--spice-button-disabled)");
+
+    const path = document.createElementNS(xmlns, "path");
+    star.append(path);
+    path.setAttributeNS(null, "fill", `url(#${gradient.id})`);
+    path.setAttributeNS(
+        null,
+        "d",
+        "M20.388,10.918L32,12.118l-8.735,7.749L25.914,31.4l-9.893-6.088L6.127,31.4l2.695-11.533L0,12.118l11.547-1.2L16.026,0.6L20.388,10.918z"
+    );
+
+    return [star, stopFirst, stopSecond];
+}
+
+export function createStars(idSuffix, size) {
+    const stars = document.createElement("span");
+    const id = `stars-${idSuffix}`;
+    stars.className = "stars";
+    stars.id = id;
+    stars.style.whiteSpace = "nowrap";
+    stars.style.alignItems = "center";
+    stars.style.display = "flex";
+
+    const starElements = [];
+    for (let i = 0; i < 5; i++) {
+        const [star, stopFirst, stopSecond] = createStar(id, i + 1, size);
+        stars.append(star);
+        starElements.push([star, stopFirst, stopSecond]);
+    }
+
+    return [stars, starElements];
+}
+
+export function setRating(starElements, rating) {
+    const halfStars = (rating /= 0.5);
+    for (let i = 0; i < 5; i++) {
+        const stopFirst = starElements[i][1];
+        const stopSecond = starElements[i][2];
+        stopFirst.setAttributeNS(null, "stop-color", "var(--spice-button-disabled)");
+        stopSecond.setAttributeNS(null, "stop-color", "var(--spice-button-disabled)");
+    }
+    for (let i = 0; i < halfStars; i++) {
+        const j = Math.floor(i / 2);
+        const stopFirst = starElements[j][1];
+        const stopSecond = starElements[j][2];
+        if (i % 2 === 0) {
+            stopFirst.setAttributeNS(null, "stop-color", "var(--spice-button)");
+        } else {
+            stopSecond.setAttributeNS(null, "stop-color", "var(--spice-button)");
         }
-        return rating;
     }
-
-    function handleMouseMove(event) {
-        onStarMouseMove(getMouseOverRating(event));
-    }
-
-    function handleClick(event) {
-        onStarClick(getMouseOverRating(event));
-    }
-
-    return (
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            xmlns:xlink="http://www.w3.org/1999/xlink"
-            width={`${size}px`}
-            height={`${size}px`}
-            viewBox="0 0 32 32"
-            onMouseMove={handleMouseMove}
-            onClick={handleClick}
-        >
-            <defs>
-                <linearGradient id={`grad-${id}-${i}`}>
-                    <stop offset="50%" stop-color={fillFirstHalf ? "var(--spice-button)" : "var(--spice-button-disabled)"} />
-                    <stop offset="50%" stop-color={fillSecondHalf ? "var(--spice-button)" : "var(--spice-button-disabled)"} />
-                </linearGradient>
-            </defs>
-            <path
-                fill={`url(#grad-${id}-${i})`}
-                d="M20.388,10.918L32,12.118l-8.735,7.749L25.914,31.4l-9.893-6.088L6.127,31.4l2.695-11.533L0,12.118
-        l11.547-1.2L16.026,0.6L20.388,10.918z"
-            />
-        </svg>
-    );
 }
 
-function fillFirstHalf(i, rating) {
-    return 2 * rating > 2 * i;
-}
-
-function fillSecondHalf(i, rating) {
-    return 2 * rating > 2 * i + 1;
-}
-
-export function TracklistStars({ trackUri, heart, onStarsClick }) {
-    const trackId = trackUri.match(/spotify:track:(.*)/)[1];
-    const rating = useSelector((state: RootState) => state.ratings.ratings[trackUri]);
-    const hasRating = typeof rating !== "undefined";
-    const mouseoverTrackUri = useSelector((state: RootState) => state.mouseoverTrack.trackUri);
-    const showPlaylistStars = useSelector((state: RootState) => state.settings.settings.showPlaylistStars);
-    const [mouseOverRating, setMouseOverRating] = useState(null);
-    const displayRating = mouseOverRating ?? rating ?? 0.0;
-
-    function handleMouseMove(rating) {
-        setMouseOverRating(rating ?? 0.0);
+export function getMouseoverRating(settings, star, i) {
+    const rect = star.getBoundingClientRect();
+    const offset = event.clientX - rect.left;
+    const half = offset > 8 || !settings.halfStarRatings;
+    const zeroStars = i === 0 && offset < 3;
+    let rating = i + 1;
+    if (!half) rating -= 0.5;
+    if (zeroStars) {
+        rating -= settings.halfStarRatings ? 0.5 : 1.0;
     }
-
-    function handleClick(rating) {
-        onStarsClick(trackUri, rating, heart);
-        setMouseOverRating(null);
-    }
-
-    function handleMouseLeave() {
-        setMouseOverRating(null);
-    }
-
-    function visibility() {
-        return showPlaylistStars && (hasRating || mouseoverTrackUri === trackUri) ? "visible" : "hidden";
-    }
-
-    const stars = [];
-    for (let i = 0; i < 5; i++)
-        stars.push(
-            <Star
-                i={i}
-                id={`stars-${trackId}`}
-                fillFirstHalf={fillFirstHalf(i, displayRating)}
-                fillSecondHalf={fillSecondHalf(i, displayRating)}
-                size="16"
-                onStarMouseMove={handleMouseMove}
-                onStarClick={handleClick}
-            />
-        );
-    return (
-        <span
-            style={{
-                lineHeight: 1.0,
-                visibility: visibility(),
-                whiteSpace: "nowrap",
-                display: "flex",
-                alignItems: "center",
-            }}
-            onMouseLeave={handleMouseLeave}
-        >
-            {stars}
-        </span>
-    );
-}
-
-export function NowPlayingStars({ getHeart, onStarsClick }) {
-    const trackUri = useSelector((state: RootState) => state.nowPlayingTrack.trackUri);
-    const rating = useSelector((state: RootState) => state.ratings.ratings[trackUri] ?? 0.0);
-    const [mouseOverRating, setMouseOverRating] = useState(null);
-    const isTrack = trackUri.includes("track");
-    const display = isTrack ? "flex" : "none";
-    const displayRating = mouseOverRating ?? rating;
-
-    function handleMouseMove(rating) {
-        setMouseOverRating(rating);
-    }
-
-    function handleClick(rating) {
-        onStarsClick(trackUri, rating, getHeart());
-        setMouseOverRating(null);
-    }
-
-    function handleMouseLeave() {
-        setMouseOverRating(null);
-    }
-
-    const stars = [];
-    for (let i = 0; i < 5; i++)
-        stars.push(
-            <Star
-                i={i}
-                id="stars-now-playing"
-                size="16"
-                fillFirstHalf={fillFirstHalf(i, displayRating)}
-                fillSecondHalf={fillSecondHalf(i, displayRating)}
-                onStarMouseMove={handleMouseMove}
-                onStarClick={handleClick}
-            />
-        );
-    return (
-        <span
-            style={{
-                lineHeight: 1.0,
-                marginLeft: 8,
-                marginRight: 8,
-                whiteSpace: "nowrap",
-                display: display,
-                alignItems: "center",
-            }}
-            onMouseLeave={handleMouseLeave}
-        >
-            {stars}
-        </span>
-    );
-}
-
-export function AlbumStars({ album }) {
-    const ratings = useSelector((state: RootState) => state.ratings.ratings);
-
-    const stars = [];
-    for (let i = 0; i < 5; i++)
-        stars.push(
-            <Star
-                i={i}
-                id="stars-album"
-                size="32"
-                fillFirstHalf={fillFirstHalf(i, getAlbumRating(ratings, album))}
-                fillSecondHalf={fillSecondHalf(i, getAlbumRating(ratings, album))}
-                onStarMouseMove={() => {}}
-                onStarClick={() => {}}
-            />
-        );
-    return (
-        <span
-            style={{
-                lineHeight: 1.0,
-                whiteSpace: "nowrap",
-                display: "flex",
-                alignItems: "center",
-            }}
-        >
-            {stars}
-        </span>
-    );
+    return rating.toFixed(1);
 }

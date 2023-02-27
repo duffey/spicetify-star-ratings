@@ -1,142 +1,227 @@
-import React from "react";
-import { useState } from "react";
-import { store } from "./store";
-import type { RootState } from "./store";
-import { Provider, useSelector, useDispatch } from "react-redux";
-import { setSetting } from "./settings-slice";
+import { saveSettings } from "./settings";
 import "./settings-ui.css";
 
-function CheckboxIcon() {
-    return (
-        <svg
-            width={16}
-            height={16}
-            viewbox="0 0 16 16"
-            fill="currentColor"
-            dangerouslySetInnerHTML={{
-                __html: Spicetify.SVGIcons.check,
-            }}
-        ></svg>
+function displayIcon({ icon, size }) {
+    return Spicetify.React.createElement("svg", {
+        width: size,
+        height: size,
+        viewBox: "0 0 16 16",
+        fill: "currentColor",
+        dangerouslySetInnerHTML: {
+            __html: icon,
+        },
+    });
+}
+
+function checkBoxItem({ settings, name, field, onclick }) {
+    let [value, setValue] = Spicetify.React.useState(settings[field]);
+    return Spicetify.React.createElement(
+        "div",
+        {
+            className: "popup-row",
+        },
+        Spicetify.React.createElement(
+            "label",
+            {
+                className: "col description",
+            },
+            name
+        ),
+        Spicetify.React.createElement(
+            "div",
+            {
+                className: "col action",
+            },
+            Spicetify.React.createElement(
+                "button",
+                {
+                    className: "checkbox" + (value ? "" : " disabled"),
+                    onClick: async () => {
+                        let state = !value;
+                        settings[field] = state;
+                        setValue(state);
+                        saveSettings(settings);
+                        onclick();
+                    },
+                },
+                Spicetify.React.createElement(displayIcon, {
+                    icon: Spicetify.SVGIcons.check,
+                    size: 16,
+                })
+            )
+        )
     );
 }
 
-function CheckboxItem({ name, field, onCheckboxClick }) {
-    const checked = useSelector((state: RootState) => state.settings.settings[field]);
-    const dispatch = useDispatch();
-    const buttonClass = checked ? "checkbox" : "checkbox disabled";
-
-    function handleOnClick() {
-        const newValue = !checked;
-        dispatch(setSetting({ setting: field, value: newValue }));
-        if (onCheckboxClick) onCheckboxClick(newValue);
-    }
-
-    return (
-        <div className="popup-row">
-            <label className="col description">{name}</label>
-            <div className="col action">
-                <button className={buttonClass} onClick={handleOnClick}>
-                    <CheckboxIcon />
-                </button>
-            </div>
-        </div>
+function dropDownItem({ settings, name, field, options, onclick }) {
+    const [value, setValue] = Spicetify.React.useState(settings[field]);
+    return Spicetify.React.createElement(
+        "div",
+        {
+            className: "popup-row",
+        },
+        Spicetify.React.createElement(
+            "label",
+            {
+                className: "col description",
+            },
+            name
+        ),
+        Spicetify.React.createElement(
+            "div",
+            {
+                className: "col action",
+            },
+            Spicetify.React.createElement(
+                "select",
+                {
+                    value,
+                    onChange: async (e) => {
+                        setValue(e.target.value);
+                        settings[field] = e.target.value;
+                        saveSettings(settings);
+                        onclick();
+                    },
+                },
+                Object.keys(options).map((item) =>
+                    Spicetify.React.createElement(
+                        "option",
+                        {
+                            value: item,
+                        },
+                        options[item]
+                    )
+                )
+            )
+        )
     );
 }
 
-function DropdownItem({ name, field, options }) {
-    const value = useSelector((state: RootState) => state.settings.settings[field]);
-    const dispatch = useDispatch();
-
-    function handleOnChange(event) {
-        dispatch(setSetting({ setting: field, value: event.target.value }));
-    }
-
-    const optionElements = [];
-    for (const [optionName, optionValue] of Object.entries(options)) optionElements.push(<option value={optionValue}>{optionName}</option>);
-
-    return (
-        <div className="popup-row">
-            <label className="col description">{name}</label>
-            <div className="col action">
-                <select value={value} onChange={handleOnChange}>
-                    {optionElements}
-                </select>
-            </div>
-        </div>
+function keyboardShortcutDescription(label, numberKey) {
+    return Spicetify.React.createElement(
+        "li",
+        {
+            className: "main-keyboardShortcutsHelpModal-sectionItem",
+        },
+        Spicetify.React.createElement(
+            "span",
+            {
+                className: "Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-sectionItemName",
+            },
+            label
+        ),
+        Spicetify.React.createElement(
+            "kbd",
+            {
+                className: "Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-key",
+            },
+            "Ctrl"
+        ),
+        Spicetify.React.createElement(
+            "kbd",
+            {
+                className: "Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-key",
+            },
+            "Alt"
+        ),
+        Spicetify.React.createElement(
+            "kbd",
+            {
+                className: "Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-key",
+            },
+            numberKey
+        )
     );
 }
 
-function KeyboardShortcutDescription({ label, numberKey }) {
-    return (
-        <li className="main-keyboardShortcutsHelpModal-sectionItem">
-            <span className="Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-sectionItemName">{label}</span>
-            <kbd className="Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-key">Ctrl</kbd>
-            <kbd className="Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-key">Alt</kbd>
-            <kbd className="Type__TypeElement-goli3j-0 ipKmGr main-keyboardShortcutsHelpModal-key">{numberKey}</kbd>
-        </li>
-    );
-}
-
-function Heading({ value }) {
-    return <h2 className="Type__TypeElement-goli3j-0 bcTfIx main-keyboardShortcutsHelpModal-sectionHeading">{value}</h2>;
-}
-
-export function Settings({ registerKeyboardShortcuts, deregisterKeyboardShortcuts, updateTracklist, restoreTracklist }) {
-    function handleHideHeartsCheckboxClick(hideHearts) {
-        const nowPlayingWidgetHeart = document.querySelector(".control-button-heart");
-        if (nowPlayingWidgetHeart) nowPlayingWidgetHeart.style.display = hideHearts ? "none" : "flex";
-        const hearts = document.querySelectorAll(".main-trackList-rowHeartButton");
-        for (const heart of hearts) heart.style.display = hideHearts ? "none" : "flex";
-    }
-
-    function handleEnableKeyboardShortcutsCheckboxClick(enableKeyboardShortcuts) {
-        if (enableKeyboardShortcuts) registerKeyboardShortcuts();
-        else deregisterKeyboardShortcuts();
-    }
-
-    function handleShowPlaylistStarsCheckboxClick(showPlaylistStars) {
-        if (showPlaylistStars) updateTracklist();
-        else restoreTracklist();
-    }
-
-    return (
-        <Provider store={store}>
-            <div>
-                <Heading value="Settings" />
-                <CheckboxItem name="Half star ratings" field="halfStarRatings" />
-                <CheckboxItem name="Hide hearts" field="hideHearts" onCheckboxClick={handleHideHeartsCheckboxClick} />
-                <CheckboxItem
-                    name="Enable keyboard shortcuts"
-                    field="enableKeyboardShortcuts"
-                    onCheckboxClick={handleEnableKeyboardShortcutsCheckboxClick}
-                />
-                <CheckboxItem name="Show playlist stars" field="showPlaylistStars" onCheckboxClick={handleShowPlaylistStarsCheckboxClick} />
-                <DropdownItem
-                    name="Auto-like/dislike threshold"
-                    field="likeThreshold"
-                    options={{
-                        disabled: "Disabled",
-                        "3.0": "3.0",
-                        "3.5": "3.5",
-                        "4.0": "4.0",
-                        "4.5": "4.5",
-                        "5.0": "5.0",
-                    }}
-                />
-                <Heading value="Keyboard Shortcuts" />
-                <ul>
-                    <KeyboardShortcutDescription label="Rate current track 0.5 stars" numberKey="1" />
-                    <KeyboardShortcutDescription label="Rate current track 1 star" numberKey="2" />
-                    <KeyboardShortcutDescription label="Rate current track 1.5 stars" numberKey="3" />
-                    <KeyboardShortcutDescription label="Rate current track 2 stars" numberKey="4" />
-                    <KeyboardShortcutDescription label="Rate current track 2.5 stars" numberKey="5" />
-                    <KeyboardShortcutDescription label="Rate current track 3 stars" numberKey="6" />
-                    <KeyboardShortcutDescription label="Rate current track 3.5 stars" numberKey="7" />
-                    <KeyboardShortcutDescription label="Rate current track 4 stars" numberKey="8" />
-                    <KeyboardShortcutDescription label="Rate current track 4.5 stars" numberKey="9" />
-                    <KeyboardShortcutDescription label="Rate current track 5 stars" numberKey="0" />
-                </ul>
-            </div>
-        </Provider>
-    );
+export function displaySettings(settings, registerKeyboardShortcuts, deregisterKeyboardShortcuts) {
+    return () => {
+        let settingsContent = Spicetify.React.createElement(
+            "div",
+            null,
+            Spicetify.React.createElement(
+                "h2",
+                {
+                    className: "Type__TypeElement-goli3j-0 bcTfIx main-keyboardShortcutsHelpModal-sectionHeading",
+                },
+                "Settings"
+            ),
+            Spicetify.React.createElement(checkBoxItem, {
+                settings: settings,
+                name: "Half star ratings",
+                field: "halfStarRatings",
+                onclick: async () => {},
+            }),
+            Spicetify.React.createElement(checkBoxItem, {
+                settings: settings,
+                name: "Hide hearts",
+                field: "hideHearts",
+                onclick: async () => {
+                    const nowPlayingWidgetHeart = document.querySelector(".control-button-heart");
+                    if (nowPlayingWidgetHeart) nowPlayingWidgetHeart.style.display = settings.hideHearts ? "none" : "flex";
+                    const hearts = document.querySelectorAll(".main-trackList-rowHeartButton");
+                    for (const heart of hearts) heart.style.display = settings.hideHearts ? "none" : "flex";
+                },
+            }),
+            Spicetify.React.createElement(checkBoxItem, {
+                settings,
+                settings,
+                name: "Enable keyboard shortcuts",
+                field: "enableKeyboardShortcuts",
+                onclick: async () => {
+                    if (settings.enableKeyboardShortcuts) {
+                        registerKeyboardShortcuts();
+                    } else {
+                        deregisterKeyboardShortcuts();
+                    }
+                },
+            }),
+            Spicetify.React.createElement(checkBoxItem, {
+                settings: settings,
+                name: "Show playlist stars",
+                field: "showPlaylistStars",
+                onclick: async () => {},
+            }),
+            Spicetify.React.createElement(dropDownItem, {
+                settings: settings,
+                name: "Auto-like/dislike threshold",
+                field: "likeThreshold",
+                options: {
+                    disabled: "Disabled",
+                    "3.0": "3.0",
+                    3.5: "3.5",
+                    "4.0": "4.0",
+                    4.5: "4.5",
+                    "5.0": "5.0",
+                },
+                onclick: async () => {},
+            }),
+            Spicetify.React.createElement(
+                "h2",
+                {
+                    className: "Type__TypeElement-goli3j-0 bcTfIx main-keyboardShortcutsHelpModal-sectionHeading",
+                },
+                "Keyboard Shortcuts"
+            ),
+            Spicetify.React.createElement(
+                "ul",
+                null,
+                keyboardShortcutDescription("Rate current track 0.5 stars", "1"),
+                keyboardShortcutDescription("Rate current track 1 star", "2"),
+                keyboardShortcutDescription("Rate current track 1.5 stars", "3"),
+                keyboardShortcutDescription("Rate current track 2 stars", "4"),
+                keyboardShortcutDescription("Rate current track 2.5 stars", "5"),
+                keyboardShortcutDescription("Rate current track 3 stars", "6"),
+                keyboardShortcutDescription("Rate current track 3.5 stars", "7"),
+                keyboardShortcutDescription("Rate current track 4 stars", "8"),
+                keyboardShortcutDescription("Rate current track 4.5 stars", "9"),
+                keyboardShortcutDescription("Rate current track 5 stars", "0")
+            )
+        );
+        Spicetify.PopupModal.display({
+            title: "Star Ratings",
+            content: settingsContent,
+            isLarge: true,
+        });
+    };
 }
