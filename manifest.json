@@ -2,7 +2,7 @@
   "name": "Star Ratings",
   "description": "Add star ratings to Spotify",
   "preview": "preview.png",
-  "main": "dist/star-ratings.js",
+  "main": "dist/starRatings.js",
   "readme": "README.md",
   "authors": [
       { "name": "Scott Duffey", "url": "https://github.com/duffey" }
