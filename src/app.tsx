@@ -196,9 +196,6 @@ function updateTracklist() {
     const tracks = tracklist.getElementsByClassName("main-trackList-trackListRow");
 
     for (const track of tracks) {
-        const getHeart = () => {
-            return track.getElementsByClassName("main-addButton-button")[0];
-        };
         const heart = track.getElementsByClassName("main-addButton-button")[0];
         const hasStars = track.getElementsByClassName("stars").length > 0;
 
@@ -217,24 +214,24 @@ function updateTracklist() {
         const isTrack = trackUri.includes("track");
         let ratingColumn = track.querySelector(".star-ratings");
 
-        if (!ratingColumn) {
-            const lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
-            const colIndexAsInt = parseInt(lastColumn.getAttribute("aria-colindex"));
-            lastColumn.setAttribute("aria-colindex", (colIndexAsInt + 1).toString());
-            ratingColumn = document.createElement("div");
-            ratingColumn.setAttribute("aria-colindex", colIndexAsInt.toString());
-            ratingColumn.role = "gridcell";
-            ratingColumn.style.display = "flex";
-            ratingColumn.classList.add("main-trackList-rowSectionVariable");
-            ratingColumn.classList.add("star-ratings");
-            track.insertBefore(ratingColumn, lastColumn);
+        if (ratingColumn) continue;
 
-            if (tracklistColumnCss[colIndexAsInt]) {
-                if (!originalTracklistTrackCss) {
-                    originalTracklistTrackCss = getComputedStyle(track).getPropertyValue("grid-template-columns");
-                }
-                track.style["grid-template-columns"] = tracklistColumnCss[colIndexAsInt];
+        const lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
+        const colIndexAsInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+        lastColumn.setAttribute("aria-colindex", (colIndexAsInt + 1).toString());
+        ratingColumn = document.createElement("div");
+        ratingColumn.setAttribute("aria-colindex", colIndexAsInt.toString());
+        ratingColumn.role = "gridcell";
+        ratingColumn.style.display = "flex";
+        ratingColumn.classList.add("main-trackList-rowSectionVariable");
+        ratingColumn.classList.add("star-ratings");
+        track.insertBefore(ratingColumn, lastColumn);
+
+        if (tracklistColumnCss[colIndexAsInt]) {
+            if (!originalTracklistTrackCss) {
+                originalTracklistTrackCss = getComputedStyle(track).getPropertyValue("grid-template-columns");
             }
+            track.style["grid-template-columns"] = tracklistColumnCss[colIndexAsInt];
         }
 
         if (!heart || !trackUri || hasStars || !isTrack) continue;

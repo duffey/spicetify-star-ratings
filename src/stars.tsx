@@ -63,15 +63,15 @@ function fillSecondHalf(i, rating) {
 
 export function TracklistStars({ trackUri, heart, onStarsClick }) {
     const trackId = trackUri.match(/spotify:track:(.*)/)[1];
-    const hasRating = useSelector((state: RootState) => state.ratings.ratings.hasOwnProperty(trackUri));
-    const rating = useSelector((state: RootState) => state.ratings.ratings[trackUri] ?? 0.0);
+    const rating = useSelector((state: RootState) => state.ratings.ratings[trackUri]);
+    const hasRating = typeof rating !== "undefined";
     const mouseoverTrackUri = useSelector((state: RootState) => state.mouseoverTrack.trackUri);
     const showPlaylistStars = useSelector((state: RootState) => state.settings.settings.showPlaylistStars);
     const [mouseOverRating, setMouseOverRating] = useState(null);
-    const displayRating = mouseOverRating ?? rating;
+    const displayRating = mouseOverRating ?? rating ?? 0.0;
 
     function handleMouseMove(rating) {
-        setMouseOverRating(rating);
+        setMouseOverRating(rating ?? 0.0);
     }
 
     function handleClick(rating) {
