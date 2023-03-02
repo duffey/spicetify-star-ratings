@@ -1,3 +1,18 @@
+export function findStars(idSuffix) {
+    const starsId = `stars-${idSuffix}`;
+    const stars = document.getElementById(starsId);
+    if (!stars) return null;
+    const starElements = [];
+    for (let i = 1; i <= 5; i++) {
+        const id = `${starsId}-${i}`;
+        const star = document.getElementById(id);
+        const stopFirst = document.getElementById(`${id}-gradient-first`);
+        const stopSecond = document.getElementById(`${id}-gradient-second`);
+        starElements.push([star, stopFirst, stopSecond]);
+    }
+    return [stars, starElements];
+}
+
 function createStar(starsId, n, size) {
     const xmlns = "http://www.w3.org/2000/svg";
     const star = document.createElementNS(xmlns, "svg");
@@ -89,5 +104,5 @@ export function getMouseoverRating(settings, star, i) {
     if (zeroStars) {
         rating -= settings.halfStarRatings ? 0.5 : 1.0;
     }
-    return rating.toFixed(1);
+    return rating;
 }

@@ -9,9 +9,7 @@ package.json
 screenshot.png
 settings.png
 src/settings-ui.css
-src/old/settings-ui.css
 src/settings.json
-src/old/types
 src/types
 tsconfig.json
 .prettierrc.json

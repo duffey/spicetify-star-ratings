@@ -22,3 +22,20 @@ export function getSettings() {
 export function saveSettings(settings) {
     api.setLocalStorageData("starRatings:settings", JSON.stringify(settings));
 }
+
+export function getPlaylistUris() {
+    try {
+        const parsed = JSON.parse(api.getLocalStorageData("starRatings:playlistUris"));
+        if (parsed && typeof parsed === "object") {
+            return parsed;
+        }
+        throw "";
+    } catch {
+        api.setLocalStorageData("starRatings:playlistUris", `{}`);
+        return {};
+    }
+}
+
+export function savePlaylistUris(playlistUris) {
+    api.setLocalStorageData("starRatings:playlistUris", JSON.stringify(playlistUris));
+}

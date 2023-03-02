@@ -165,7 +165,6 @@ export function displaySettings(settings, registerKeyboardShortcuts, deregisterK
             }),
             Spicetify.React.createElement(checkBoxItem, {
                 settings,
-                settings,
                 name: "Enable keyboard shortcuts",
                 field: "enableKeyboardShortcuts",
                 onclick: async () => {
