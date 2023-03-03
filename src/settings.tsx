@@ -53,3 +53,11 @@ export function getPlaylistUris() {
 export function savePlaylistUris(playlistUris) {
     api.setLocalStorageData("starRatings:playlistUris", JSON.stringify(playlistUris));
 }
+
+export function getRatedFolderUri() {
+    return api.getLocalStorageData("starRatings:ratedFolderUri");
+}
+
+export function saveRatedFolderUri(ratedFolderUri) {
+    api.setLocalStorageData("starRatings:ratedFolderUri", ratedFolderUri);
+}

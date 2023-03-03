@@ -1,7 +1,11 @@
 import * as api from "./api";
 
-export function findRatedFolder(contents) {
-    return contents.items.find((item) => item.type === "folder" && item.name === "Rated");
+export function findFolderByUri(contents, uri) {
+    return contents.items.find((item) => item.type === "folder" && item.uri === uri);
+}
+
+export function findFolderByName(contents, name) {
+    return contents.items.find((item) => item.type === "folder" && item.name === name);
 }
 
 // Remove playlist URIs from settings when they no longer exist
@@ -84,10 +88,6 @@ export async function deleteLowestRatings(playlistUris, ratings) {
             });
     }
     await Promise.all(promises);
-}
-
-export async function createRatedFolder() {
-    await api.createFolder("Rated");
 }
 
 export function getAlbumRating(ratings, album) {

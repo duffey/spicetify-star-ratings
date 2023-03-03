@@ -1,23 +1,23 @@
 import * as api from "./api";
 import { createStars, setRating, getMouseoverRating, findStars } from "./stars";
-import { getSettings, saveSettings, getPlaylistUris, savePlaylistUris } from "./settings";
+import { getSettings, saveSettings, getPlaylistUris, savePlaylistUris, getRatedFolderUri, saveRatedFolderUri } from "./settings";
 import { Settings } from "./settings-ui";
 import {
-    findRatedFolder,
+    findFolderByName,
+    findFolderByUri,
     addPlaylistUris,
     removePlaylistUris,
     getAllPlaylistItems,
     getRatings,
     takeHighestRatings,
     getPlaylistNames,
-    createRatedFolder,
     deleteLowestRatings,
     getAlbumRating,
 } from "./ratings";
 
 let settings = null;
 
-let ratedFolder = null;
+let ratedFolderUri = null;
 let ratings = {};
 let playlistNames = {};
 let playlistUris = {};
@@ -97,15 +97,17 @@ async function handleSetRating(trackUri, oldRating, newRating) {
         const playlistName = playlistNames[playlistUri];
         await api.deleteTrackFromPlaylist(playlistUri, trackUri);
     }
-    if (!ratedFolder) {
-        await createRatedFolder();
+    if (!ratedFolderUri) {
+        await api.createFolder("Rated");
         const contents = await api.getContents();
-        ratedFolder = findRatedFolder(contents);
+        const ratedFolder = findFolderByName(contents, "Rated");
+        ratedFolderUri = ratedFolder.uri;
+        saveRatedFolderUri(ratedFolderUri);
     }
     const newRatingAsString = newRating.toFixed(1);
     let playlistUri = playlistUris[newRatingAsString];
     if (!playlistUri) {
-        playlistUri = await api.createPlaylist(newRatingAsString, ratedFolder.uri);
+        playlistUri = await api.createPlaylist(newRatingAsString, ratedFolderUri);
         await api.makePlaylistPrivate(playlistUri);
         playlistUris[newRatingAsString] = playlistUri;
         savePlaylistUris(playlistUris);
@@ -391,6 +393,12 @@ function updateNowPlayingWidget() {
     setRating(nowPlayingWidgetStarData[1], currentRating);
 }
 
+function shouldAddContextMenuOnFolders(uri) {
+    let uriObj = Spicetify.URI.fromString(uri[0]);
+    let { Type } = Spicetify.URI;
+    return uriObj.type === Type.FOLDER;
+}
+
 async function main() {
     while (!Spicetify?.showNotification) {
         await new Promise((resolve) => setTimeout(resolve, 100));
@@ -399,12 +407,25 @@ async function main() {
     settings = getSettings();
     saveSettings(settings);
 
-    const contents = await api.getContents();
-    ratedFolder = findRatedFolder(contents);
+    ratedFolderUri = getRatedFolderUri();
     ratings = {};
     playlistNames = {};
-
     playlistUris = getPlaylistUris();
+    let ratedFolder = null;
+
+    if (ratedFolderUri) {
+        const contents = await api.getContents();
+        ratedFolder = findFolderByUri(contents, ratedFolderUri);
+    } else {
+        // TODO: Remove after next release
+        const contents = await api.getContents();
+        ratedFolder = findFolderByName(contents, "Rated");
+        if (ratedFolder) {
+            ratedFolderUri = ratedFolder.uri;
+            saveRatedFolderUri(ratedFolderUri);
+        }
+    }
+
     if (ratedFolder) {
         let playlistUrisRemoved = false;
         [playlistUrisRemoved, playlistUris] = removePlaylistUris(playlistUris, ratedFolder);
@@ -422,6 +443,8 @@ async function main() {
     } else if (Object.keys(playlistUris).length > 0) {
         playlistUris = {};
         savePlaylistUris(playlistUris);
+        ratedFolderUri = "";
+        saveRatedFolderUri(ratedFolderUri);
     }
 
     const keys = {
@@ -459,6 +482,16 @@ async function main() {
     Spicetify.Platform.History.listen(async () => {
         await updateAlbumStars();
     });
+
+    new Spicetify.ContextMenu.Item(
+        "Use as Rated folder (Requires reload)",
+        (uri) => {
+            ratedFolderUri = uri;
+            saveRatedFolderUri(ratedFolderUri);
+            location.reload();
+        },
+        shouldAddContextMenuOnFolders
+    ).register();
 
     const observer = new MutationObserver(async () => {
         await observerCallback(keys);
