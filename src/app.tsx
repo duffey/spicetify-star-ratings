@@ -231,6 +231,8 @@ function updateTracklist() {
     if (tracklistsChanged) {
         originalTracklistHeaderCss = null;
         originalTracklistTrackCss = null;
+        albumPlayButton = null;
+        document.querySelector("#stars-album")?.remove();
     }
 
     const tracklistColumnCss = [
