@@ -43,6 +43,13 @@ let nowPlayingWidgetStarData = null;
 
 let clickListenerRunning = false;
 
+function isAlbumPage() {
+    const pathname = Spicetify.Platform.History.location.pathname;
+    const matches = pathname.match(/album\/(.*)/);
+    if (!matches) return null;
+    return matches[1];
+}
+
 function trackUriToTrackId(trackUri) {
     return trackUri.match(/spotify:track:(.*)/)[1];
 }
@@ -231,8 +238,6 @@ function updateTracklist() {
     if (tracklistsChanged) {
         originalTracklistHeaderCss = null;
         originalTracklistTrackCss = null;
-        albumPlayButton = null;
-        document.querySelector("#stars-album")?.remove();
     }
 
     const tracklistColumnCss = [
@@ -354,19 +359,21 @@ async function observerCallback(keys) {
     oldAlbumPlayButton = albumPlayButton;
     albumPlayButton = document.querySelector(".main-actionBar-ActionBar .main-playButton-PlayButton");
     if (albumPlayButton && !albumPlayButton.isEqualNode(oldAlbumPlayButton)) {
-        const isAlbumPage = () => {
-            const pathname = Spicetify.Platform.History.location.pathname;
-            const matches = pathname.match(/album\/(.*)/);
-            if (!matches) return null;
-            return matches[1];
-        };
-        albumId = isAlbumPage();
-        if (!albumId) return;
-        album = await api.getAlbum(albumId);
         albumStarData = createStars("album", 32);
         albumPlayButton.after(albumStarData[0]);
+        await updateAlbumStars();
         updateAlbumRating();
     }
+}
+
+async function updateAlbumStars() {
+    if (!albumStarData) return;
+
+    albumId = isAlbumPage();
+    albumStarData[0].style.display = albumId ? "flex" : "none";
+    if (!albumId) return;
+    album = await api.getAlbum(albumId);
+    updateAlbumRating();
 }
 
 function updateNowPlayingWidget() {
@@ -447,6 +454,10 @@ async function main() {
 
     Spicetify.Player.addEventListener("songchange", () => {
         updateNowPlayingWidget();
+    });
+
+    Spicetify.Platform.History.listen(async () => {
+        await updateAlbumStars();
     });
 
     const observer = new MutationObserver(async () => {
