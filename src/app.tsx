@@ -1,7 +1,7 @@
 import * as api from "./api";
 import { createStars, setRating, getMouseoverRating, findStars } from "./stars";
 import { getSettings, saveSettings, getPlaylistUris, savePlaylistUris } from "./settings";
-import { displaySettings } from "./settings-ui";
+import { Settings } from "./settings-ui";
 import {
     findRatedFolder,
     addPlaylistUris,
@@ -16,17 +16,19 @@ import {
 } from "./ratings";
 
 let settings = null;
-const fiveColumnGridCss = "[index] 16px [first] 4fr [var1] 2fr [var2] 1fr [last] minmax(120px,1fr)";
-const sixColumnGridCss = "[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] 2fr [last] minmax(120px,1fr)";
-const sevenColumnGridCss = "[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var3] 2fr [last] minmax(120px,1fr)";
 
 let ratedFolder = null;
 let ratings = {};
 let playlistNames = {};
 let playlistUris = {};
 
-let oldTracklist = null;
-let tracklist = null;
+let originalTracklistHeaderCss = null;
+let originalTracklistTrackCss = null;
+let oldMainElement = null;
+let mainElement = null;
+let mainElementObserver = null;
+let tracklists = [];
+let oldTracklists = [];
 
 let oldNowPlayingWidget = null;
 let nowPlayingWidget = null;
@@ -36,11 +38,8 @@ let albumPlayButton = null;
 
 let albumId = null;
 let album = null;
-let updateNowPlayingWidget = null;
 let albumStarData = null;
 let nowPlayingWidgetStarData = null;
-
-let tracklistObserver = null;
 
 let clickListenerRunning = false;
 
@@ -138,12 +137,13 @@ function getClickListener(i, ratingOverride, starData, getTrackUri, getHeart) {
         }
 
         promise.finally(() => {
-            const [, tracklistStarElements] = findStars(trackUriToTrackId(trackUri));
-            if (tracklistStarElements) setRating(tracklistStarElements, displayRating);
+            tracklistStarData = findStars(trackUriToTrackId(trackUri));
+            if (tracklistStarData) {
+                setRating(tracklistStarData[1], displayRating);
+                tracklistStarData[0].style.visibility = oldRating === newRating ? "hidden" : "visible";
+            }
 
-            const [, nowPlayingStarElements] = findStars("now-playing");
-            if (nowPlayingStarElements) setRating(nowPlayingStarElements, displayRating);
-
+            updateNowPlayingWidget();
             updateAlbumRating();
 
             clickListenerRunning = false;
@@ -151,7 +151,7 @@ function getClickListener(i, ratingOverride, starData, getTrackUri, getHeart) {
     };
 }
 
-function registerKeyboardShortcuts(keys) {
+function getRegisterKeyboardShortcuts(keys) {
     return () => {
         for (const [rating, key] of Object.entries(keys)) {
             Spicetify.Keyboard.registerShortcut(
@@ -166,7 +166,7 @@ function registerKeyboardShortcuts(keys) {
     };
 }
 
-function deregisterKeyboardShortcuts(keys) {
+function getDeregisterKeyboardShortcuts(keys) {
     return () => {
         for (const key of Object.values(keys)) {
             Spicetify.Keyboard._deregisterShortcut({
@@ -201,11 +201,37 @@ function addStarsListeners(starData, getTrackUri, getHeart) {
     }
 }
 
+function restoreTracklist() {
+    const tracklistHeaders = document.querySelectorAll(".main-trackList-trackListHeaderRow");
+    tracklistHeaders.forEach((tracklistHeader) => {
+        tracklistHeader.style["grid-template-columns"] = originalTracklistHeaderCss;
+    });
+
+    for (const tracklist of tracklists) {
+        const tracks = tracklist.getElementsByClassName("main-trackList-trackListRow");
+        for (const track of tracks) {
+            let ratingColumn = track.querySelector(".starRatings");
+            if (!ratingColumn) continue;
+            track.style["grid-template-columns"] = originalTracklistTrackCss;
+            ratingColumn.remove();
+            let lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
+            let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+            lastColumn.setAttribute("aria-colindex", (colIndexInt - 1).toString());
+        }
+    }
+}
+
 function updateTracklist() {
     if (!settings.showPlaylistStars) return;
-    const tracklist_ = document.querySelector(".main-trackList-indexable");
-    if (!tracklist_) return;
-    const tracks = tracklist_.getElementsByClassName("main-trackList-trackListRow");
+
+    oldTracklists = tracklists;
+    tracklists = Array.from(document.querySelectorAll(".main-trackList-indexable"));
+    let tracklistsChanged = tracklists.length !== oldTracklists.length;
+    for (let i = 0; i < tracklists.length; i++) if (!tracklists[i].isEqualNode(oldTracklists[i])) tracklistsChanged = true;
+    if (tracklistsChanged) {
+        originalTracklistHeaderCss = null;
+        originalTracklistTrackCss = null;
+    }
 
     const tracklistColumnCss = [
         null,
@@ -217,80 +243,91 @@ function updateTracklist() {
         "[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var3] 2fr [last] minmax(120px,1fr)",
     ];
 
-    const tracklistHeader = document.querySelector(".main-trackList-trackListHeaderRow");
+    const tracklistHeaders = document.querySelectorAll(".main-trackList-trackListHeaderRow");
     // No tracklist header on Artist page
-    if (tracklistHeader) {
+    tracklistHeaders.forEach((tracklistHeader) => {
         let lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
         let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
 
-        if (tracklistColumnCss[colIndexInt]) tracklistHeader.style["grid-template-columns"] = tracklistColumnCss[colIndexInt];
-    }
+        if (!originalTracklistHeaderCss) originalTracklistHeaderCss = getComputedStyle(tracklistHeader).gridTemplateColumns;
+        if (originalTracklistHeaderCss && tracklistColumnCss[colIndexInt])
+            tracklistHeader.style["grid-template-columns"] = tracklistColumnCss[colIndexInt];
+    });
 
-    for (const track of tracks) {
-        const getHeart = () => {
-            return track.getElementsByClassName("main-addButton-button")[0];
-        };
-        const heart = track.getElementsByClassName("main-addButton-button")[0];
-        const hasStars = track.getElementsByClassName("stars").length > 0;
-        const trackUri = getTracklistTrackUri(track);
-        const isTrack = trackUri.includes("track");
+    for (const tracklist of tracklists) {
+        const tracks = tracklist.getElementsByClassName("main-trackList-trackListRow");
+        for (const track of tracks) {
+            const getHeart = () => {
+                return track.getElementsByClassName("main-addButton-button")[0];
+            };
+            const heart = track.getElementsByClassName("main-addButton-button")[0];
+            const hasStars = track.getElementsByClassName("stars").length > 0;
+            const trackUri = getTracklistTrackUri(track);
+            const isTrack = trackUri.includes("track");
 
-        let ratingColumn = track.querySelector(".starRatings");
-        if (!ratingColumn) {
-            // Add column for stars
-            let lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
-            let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
-            lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
-            ratingColumn = document.createElement("div");
-            ratingColumn.setAttribute("aria-colindex", colIndexInt.toString());
-            ratingColumn.role = "gridcell";
-            ratingColumn.style.display = "flex";
-            ratingColumn.classList.add("main-trackList-rowSectionVariable");
-            ratingColumn.classList.add("starRatings");
-            track.insertBefore(ratingColumn, lastColumn);
+            let ratingColumn = track.querySelector(".starRatings");
+            if (!ratingColumn) {
+                // Add column for stars
+                let lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
+                let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+                lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
+                ratingColumn = document.createElement("div");
+                ratingColumn.setAttribute("aria-colindex", colIndexInt.toString());
+                ratingColumn.role = "gridcell";
+                ratingColumn.style.display = "flex";
+                ratingColumn.classList.add("main-trackList-rowSectionVariable");
+                ratingColumn.classList.add("starRatings");
+                track.insertBefore(ratingColumn, lastColumn);
 
-            if (tracklistColumnCss[colIndexInt]) track.style["grid-template-columns"] = tracklistColumnCss[colIndexInt];
-        }
+                if (!originalTracklistTrackCss) originalTracklistTrackCss = getComputedStyle(track).gridTemplateColumns;
+                if (tracklistColumnCss[colIndexInt]) track.style["grid-template-columns"] = tracklistColumnCss[colIndexInt];
+            }
 
-        if (!heart || !trackUri || hasStars || !isTrack) continue;
+            if (!heart || !trackUri || hasStars || !isTrack) continue;
 
-        const starData = createStars(trackUriToTrackId(trackUri), 16);
-        const stars = starData[0];
-        const starElements = starData[1];
-        const currentRating = ratings[trackUri] ?? 0.0;
-        ratingColumn.appendChild(stars);
-        setRating(starElements, currentRating);
-        getHeart().style.display = settings.hideHearts ? "none" : "flex";
-        addStarsListeners(
-            starData,
-            () => {
-                return trackUri;
-            },
-            getHeart
-        );
+            const starData = createStars(trackUriToTrackId(trackUri), 16);
+            const stars = starData[0];
+            const starElements = starData[1];
+            const currentRating = ratings[trackUri] ?? 0.0;
+            ratingColumn.appendChild(stars);
+            setRating(starElements, currentRating);
+            getHeart().style.display = settings.hideHearts ? "none" : "flex";
+            addStarsListeners(
+                starData,
+                () => {
+                    return trackUri;
+                },
+                getHeart
+            );
 
-        // Add listeners for hovering over a track in the tracklist
-        stars.style.visibility = typeof ratings[trackUri] !== "undefined" ? "visible" : "hidden";
-
-        track.addEventListener("mouseover", () => {
-            stars.style.visibility = "visible";
-        });
-
-        track.addEventListener("mouseout", () => {
+            // Add listeners for hovering over a track in the tracklist
             stars.style.visibility = typeof ratings[trackUri] !== "undefined" ? "visible" : "hidden";
-        });
+
+            track.addEventListener("mouseover", () => {
+                stars.style.visibility = "visible";
+            });
+
+            track.addEventListener("mouseout", () => {
+                stars.style.visibility = typeof ratings[trackUri] !== "undefined" ? "visible" : "hidden";
+            });
+        }
     }
 }
 
+function onClickShowPlaylistStars() {
+    if (settings.showPlaylistStars) updateTracklist();
+    else restoreTracklist();
+}
+
 async function observerCallback(keys) {
-    oldTracklist = tracklist;
-    tracklist = document.querySelector(".main-trackList-indexable");
-    if (tracklist && !tracklist.isEqualNode(oldTracklist)) {
-        if (oldTracklist) {
-            tracklistObserver.disconnect();
+    oldMainElement = mainElement;
+    mainElement = document.querySelector("main");
+    if (mainElement && !mainElement.isEqualNode(oldMainElement)) {
+        if (oldMainElement) {
+            mainElementObserver.disconnect();
         }
         updateTracklist();
-        tracklistObserver.observe(tracklist, {
+        mainElementObserver.observe(mainElement, {
             childList: true,
             subtree: true,
         });
@@ -308,7 +345,7 @@ async function observerCallback(keys) {
         addStarsListeners(nowPlayingWidgetStarData, getNowPlayingTrackUri, getNowPlayingHeart);
         updateNowPlayingWidget();
         if (settings.enableKeyboardShortcuts) {
-            registerKeyboardShortcuts(keys)();
+            getRegisterKeyboardShortcuts(keys)();
         }
     }
 
@@ -328,6 +365,21 @@ async function observerCallback(keys) {
         albumPlayButton.after(albumStarData[0]);
         updateAlbumRating();
     }
+}
+
+function updateNowPlayingWidget() {
+    if (!nowPlayingWidgetStarData) return;
+
+    const getTrackUri = () => {
+        return Spicetify.Player.data.track.uri;
+    };
+    const trackUri = getTrackUri();
+    const isTrack = trackUri.includes("track");
+
+    nowPlayingWidgetStarData[0].style.display = isTrack ? "flex" : "none";
+
+    const currentRating = ratings[trackUri] ?? 0.0;
+    setRating(nowPlayingWidgetStarData[1], currentRating);
 }
 
 async function main() {
@@ -376,28 +428,18 @@ async function main() {
         "4.5": Spicetify.Keyboard.KEYS.NUMPAD_9,
     };
 
-    new Spicetify.Menu.Item(
-        "Star Ratings",
-        false,
-        displaySettings(settings, registerKeyboardShortcuts(keys), deregisterKeyboardShortcuts(keys))
-    ).register();
+    const registerKeyboardShortcuts = getRegisterKeyboardShortcuts(keys);
+    const deregisterKeyboardShortcuts = getDeregisterKeyboardShortcuts(keys);
 
-    updateNowPlayingWidget = () => {
-        if (!nowPlayingWidgetStarData) return;
+    new Spicetify.Menu.Item("Star Ratings", false, () => {
+        Spicetify.PopupModal.display({
+            title: "Star Ratings",
+            content: Settings({ settings, registerKeyboardShortcuts, deregisterKeyboardShortcuts, updateTracklist, restoreTracklist }),
+            isLarge: true,
+        });
+    }).register();
 
-        const getTrackUri = () => {
-            return Spicetify.Player.data.track.uri;
-        };
-        const trackUri = getTrackUri();
-        const isTrack = trackUri.includes("track");
-
-        nowPlayingWidgetStarData[0].style.display = isTrack ? "flex" : "none";
-
-        const currentRating = ratings[trackUri] ?? 0.0;
-        setRating(nowPlayingWidgetStarData[1], currentRating);
-    };
-
-    tracklistObserver = new MutationObserver(() => {
+    mainElementObserver = new MutationObserver(() => {
         updateTracklist();
     });
 

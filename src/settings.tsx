@@ -1,22 +1,36 @@
 import * as api from "./api";
 
 export function getSettings() {
+    const defaultSettings = {
+        halfStarRatings: true,
+        likeThreshold: "4.0",
+        hideHearts: false,
+        enableKeyboardShortcuts: true,
+        showPlaylistStars: true,
+    };
+    settings = {};
     try {
         const parsed = JSON.parse(api.getLocalStorageData("starRatings:settings"));
         if (parsed && typeof parsed === "object") {
-            return parsed;
+            settings = parsed;
+        } else {
+            throw "";
         }
-        throw "";
     } catch {
-        api.setLocalStorageData("starRatings:settings", `{}`);
-        return {
-            halfStarRatings: true,
-            likeThreshold: "4.0",
-            hideHearts: false,
-            enableKeyboardShortcuts: true,
-            showPlaylistStars: true,
-        };
+        api.setLocalStorageData("starRatings:settings", defaultSettings);
+        return defaultSettings;
     }
+    let modified = false;
+    for (const key of Object.keys(defaultSettings)) {
+        if (!settings.hasOwnProperty(key)) {
+            settings[key] = defaultSettings[key];
+            modified = true;
+        }
+    }
+    if (modified) {
+        api.setLocalStorageData("starRatings:settings", settings);
+    }
+    return settings;
 }
 
 export function saveSettings(settings) {
