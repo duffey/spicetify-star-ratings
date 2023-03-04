@@ -42,6 +42,7 @@ let albumStarData = null;
 let nowPlayingWidgetStarData = null;
 
 let clickListenerRunning = false;
+let ratingsLoading = false;
 
 function isAlbumPage() {
     const pathname = Spicetify.Platform.History.location.pathname;
@@ -120,7 +121,7 @@ async function handleSetRating(trackUri, oldRating, newRating) {
 
 function getClickListener(i, ratingOverride, starData, getTrackUri, getHeart) {
     return () => {
-        if (clickListenerRunning) return;
+        if (clickListenerRunning || ratingsLoading) return;
         clickListenerRunning = true;
         const [stars, starElements] = starData;
         const star = starElements[i][0];
@@ -399,14 +400,7 @@ function shouldAddContextMenuOnFolders(uri) {
     return uriObj.type === Type.FOLDER;
 }
 
-async function main() {
-    while (!Spicetify?.showNotification) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-
-    settings = getSettings();
-    saveSettings(settings);
-
+async function loadRatings() {
     ratedFolderUri = getRatedFolderUri();
     ratings = {};
     playlistNames = {};
@@ -446,6 +440,17 @@ async function main() {
         ratedFolderUri = "";
         saveRatedFolderUri(ratedFolderUri);
     }
+}
+
+async function main() {
+    while (!Spicetify?.showNotification) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    settings = getSettings();
+    saveSettings(settings);
+
+    await loadRatings();
 
     const keys = {
         "5.0": Spicetify.Keyboard.KEYS.NUMPAD_0,
@@ -484,11 +489,14 @@ async function main() {
     });
 
     new Spicetify.ContextMenu.Item(
-        "Use as Rated folder (Requires reload)",
+        "Use as Rated folder",
         (uri) => {
             ratedFolderUri = uri;
             saveRatedFolderUri(ratedFolderUri);
-            location.reload();
+            ratingsLoading = true;
+            loadRatings().finally(() => {
+                ratingsLoading = false;
+            });
         },
         shouldAddContextMenuOnFolders
     ).register();
