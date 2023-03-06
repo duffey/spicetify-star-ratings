@@ -2,6 +2,7 @@ import * as api from "./api";
 import { createStars, setRating, getMouseoverRating, findStars } from "./stars";
 import { getSettings, saveSettings, getPlaylistUris, savePlaylistUris, getRatedFolderUri, saveRatedFolderUri } from "./settings";
 import { Settings } from "./settings-ui";
+import { SortModal } from "./sort-modal";
 import {
     findFolderByName,
     findFolderByUri,
@@ -13,6 +14,7 @@ import {
     getPlaylistNames,
     deleteLowestRatings,
     getAlbumRating,
+    sortPlaylistByRating,
 } from "./ratings";
 
 let settings = null;
@@ -43,6 +45,7 @@ let nowPlayingWidgetStarData = null;
 
 let clickListenerRunning = false;
 let ratingsLoading = false;
+let isSorting = false;
 
 function isAlbumPage() {
     const pathname = Spicetify.Platform.History.location.pathname;
@@ -121,7 +124,7 @@ async function handleSetRating(trackUri, oldRating, newRating) {
 
 function getClickListener(i, ratingOverride, starData, getTrackUri, getHeart) {
     return () => {
-        if (clickListenerRunning || ratingsLoading) return;
+        if (clickListenerRunning || ratingsLoading || isSorting) return;
         clickListenerRunning = true;
         const [stars, starElements] = starData;
         const star = starElements[i][0];
@@ -396,8 +399,17 @@ function updateNowPlayingWidget() {
 
 function shouldAddContextMenuOnFolders(uri) {
     let uriObj = Spicetify.URI.fromString(uri[0]);
-    let { Type } = Spicetify.URI;
-    return uriObj.type === Type.FOLDER;
+    return uriObj.type === Spicetify.URI.Type.FOLDER;
+}
+
+function shouldAddContextMenuOnPlaylists(uri) {
+    let uriObj = Spicetify.URI.fromString(uri[0]);
+    switch (uriObj.type) {
+        case Spicetify.URI.Type.PLAYLIST:
+        case Spicetify.URI.Type.PLAYLIST_V2:
+            return true;
+    }
+    return false;
 }
 
 async function loadRatings() {
@@ -491,7 +503,7 @@ async function main() {
     new Spicetify.ContextMenu.Item(
         "Use as Rated folder",
         (uri) => {
-            ratedFolderUri = uri;
+            ratedFolderUri = uri[0];
             saveRatedFolderUri(ratedFolderUri);
             ratingsLoading = true;
             loadRatings().finally(() => {
@@ -499,6 +511,29 @@ async function main() {
             });
         },
         shouldAddContextMenuOnFolders
+    ).register();
+
+    new Spicetify.ContextMenu.Item(
+        "Sort by rating",
+        (uri) => {
+            Spicetify.PopupModal.display({
+                title: "Modify Custom order?",
+                content: SortModal({
+                    onClickCancel: () => {
+                        Spicetify.PopupModal.hide();
+                    },
+                    onClickOK: () => {
+                        Spicetify.PopupModal.hide();
+                        isSorting = true;
+                        api.showNotification("Sorting...");
+                        sortPlaylistByRating(uri[0], ratings).finally(() => {
+                            isSorting = false;
+                        });
+                    },
+                }),
+            });
+        },
+        shouldAddContextMenuOnPlaylists
     ).register();
 
     const observer = new MutationObserver(async () => {

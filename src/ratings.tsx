@@ -106,3 +106,44 @@ export function getAlbumRating(ratings, album) {
     averageRating = (Math.round(averageRating * 2) / 2).toFixed(1);
     return averageRating;
 }
+
+export async function sortPlaylistByRating(playlistUri, ratings) {
+    const ratingKeys = ["5.0", "4.5", "4.0", "3.5", "3.0", "2.5", "2.0", "1.5", "1.0", "0.5", "0.0"];
+
+    const items = await api.getPlaylistItems(playlistUri);
+
+    if (items.length === 0) return;
+
+    // Create map from ratings to list of UIDs
+    const ratingToUids = {};
+    for (const rating of ratingKeys) ratingToUids[rating] = [];
+    for (const item of items) {
+        const rating = ratings[item.link] ?? 0.0;
+        const ratingAsString = rating.toFixed(1);
+        ratingToUids[ratingAsString].push(item.rowId);
+    }
+
+    function getHighestRatedUid(ratingToUids) {
+        for (const rating of ratingKeys) {
+            if (ratingToUids[rating].length > 0) return ratingToUids[rating][0];
+        }
+        return null;
+    }
+
+    let previousIterationLastUid = getHighestRatedUid(ratingToUids);
+    const firstUid = items[0].rowId;
+    const isFirstItemHighestRated = previousIterationLastUid === firstUid;
+    let isFirstIteration = true;
+    for (const rating of ratingKeys) {
+        if (ratingToUids[rating].length === 0) continue;
+
+        if (!isFirstItemHighestRated && isFirstIteration) {
+            await api.moveTracksBefore(playlistUri, ratingToUids[rating], previousIterationLastUid);
+        } else {
+            await api.moveTracksAfter(playlistUri, ratingToUids[rating], previousIterationLastUid);
+        }
+
+        isFirstIteration = false;
+        previousIterationLastUid = ratingToUids[rating].slice(-1)[0];
+    }
+}

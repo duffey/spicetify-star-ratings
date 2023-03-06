@@ -14,3 +14,7 @@ Add star ratings to Spotify
 
 Settings, such as enabling/disabling half star ratings, can be accessed from the menu at the top right
 ![Settings](settings.png)
+
+## Credits
+
+Thanks to [Tetrax-10](https://github.com/Tetrax-10) for the playlist sorting code

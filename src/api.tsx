@@ -77,3 +77,19 @@ export async function getPlaylistItems(uri) {
     const result = await Spicetify.CosmosAsync.get(`sp://core-playlist/v1/playlist/${uri}`);
     return result.items;
 }
+
+export async function moveTracksBefore(playlistUri, trackUids, beforeUid) {
+    await Spicetify.Platform.PlaylistAPI.move(
+        playlistUri,
+        trackUids.map((uid) => ({ uid: uid })),
+        { before: { uid: beforeUid } }
+    );
+}
+
+export async function moveTracksAfter(playlistUri, trackUids, afterUid) {
+    await Spicetify.Platform.PlaylistAPI.move(
+        playlistUri,
+        trackUids.map((uid) => ({ uid: uid })),
+        { after: { uid: afterUid } }
+    );
+}
