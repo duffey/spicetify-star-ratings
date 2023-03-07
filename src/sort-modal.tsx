@@ -13,7 +13,6 @@ export function Button({ name, className, onButtonClick }) {
 export function SortModal({ onClickCancel, onClickOK }) {
     return (
         <div className="parent-div">
-            <h2>Modify Custom order?</h2>
             <p>
                 This will modify the <b>Custom order</b> of the playlist.
             </p>

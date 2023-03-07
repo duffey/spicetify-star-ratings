@@ -1,43 +1,3 @@
-.main-trackCreditsModal-header {
-    display: none;
-}
-
-.main-trackCreditsModal-container {
-    animation-name: slideIn;
-    animation-duration: 0.4s;
-}
-
-.GenericModal {
-    background: transparent !important;
-}
-
-.main-trackCreditsModal-mainSection {
-    padding: 32px;
-    border-radius: 8px;
-    background-color: var(--spice-text) !important;
-    color: var(--spice-sidebar) !important;
-}
-
-@keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translateY(-20%);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.main-trackCreditsModal-originalCredits {
-    padding: 0;
-}
-
-.main-trackCreditsModal-closeBtn {
-    display: none;
-}
-
 .parent-div {
     display: flex;
     flex-direction: column;
@@ -55,7 +15,7 @@
     background-color: transparent;
     font-weight: 700;
     border: 0;
-    color: var(--spice--sidebar);
+    color: var(--spice-text);
     display: inline-flex;
     border-radius: 500px;
     font-size: inherit;
@@ -72,7 +32,7 @@
     background-color: var(--spice-button-active);
     font-weight: 700;
     border: 0;
-    color: var(--spice-sidebar);
+    color: var(--spice-main);
     display: inline-flex;
     border-radius: 500px;
     font-size: inherit;

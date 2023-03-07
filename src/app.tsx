@@ -517,6 +517,7 @@ async function main() {
         "Sort by rating",
         (uri) => {
             Spicetify.PopupModal.display({
+                title: "Modify Custom order?",
                 content: SortModal({
                     onClickCancel: () => {
                         Spicetify.PopupModal.hide();
