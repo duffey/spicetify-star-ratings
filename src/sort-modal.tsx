@@ -12,11 +12,12 @@ export function Button({ name, className, onButtonClick }) {
 
 export function SortModal({ onClickCancel, onClickOK }) {
     return (
-        <div className="encore-light-theme RVgHI2ejYct8LjT1AO7m button-div">
-            <p className="Type__TypeElement-sc-goli3j-0 juFXol">
+        <div className="parent-div">
+            <h2>Modify Custom order?</h2>
+            <p>
                 This will modify the <b>Custom order</b> of the playlist.
             </p>
-            <div className="X05XDhpQJ7THPHfgbUk1">
+            <div className="button-div">
                 <Button name="Cancel" className="cancel-button" onButtonClick={onClickCancel} />
                 <Button name="Sort" className="ok-button" onButtonClick={onClickOK} />
             </div>

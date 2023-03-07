@@ -78,18 +78,27 @@ export async function getPlaylistItems(uri) {
     return result.items;
 }
 
+// TODO: Remove when Linux gets newer release
+export async function isAppLaterThan(specifiedVersion) {
+    let appInfo = await Spicetify.CosmosAsync.get("sp://desktop/v1/version");
+    let result = appInfo.version.localeCompare(specifiedVersion, undefined, { numeric: true, sensitivity: "base" });
+    return result === 1;
+}
+
 export async function moveTracksBefore(playlistUri, trackUids, beforeUid) {
+    const isV2 = await isAppLaterThan("1.2.5.1006.g22820f93");
     await Spicetify.Platform.PlaylistAPI.move(
         playlistUri,
         trackUids.map((uid) => ({ uid: uid })),
-        { before: { uid: beforeUid } }
+        { before: isV2 ? { uid: beforeUid } : beforeUid }
     );
 }
 
 export async function moveTracksAfter(playlistUri, trackUids, afterUid) {
+    const isV2 = await isAppLaterThan("1.2.5.1006.g22820f93");
     await Spicetify.Platform.PlaylistAPI.move(
         playlistUri,
         trackUids.map((uid) => ({ uid: uid })),
-        { after: { uid: afterUid } }
+        { after: isV2 ? { uid: afterUid } : afterUid }
     );
 }
