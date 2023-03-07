@@ -127,7 +127,7 @@ export function Settings({
                 name="Auto-like/dislike threshold"
                 field="likeThreshold"
                 options={{
-                    disabled: "Disabled",
+                    Disabled: "disabled",
                     "3.0": "3.0",
                     "3.5": "3.5",
                     "4.0": "4.0",
@@ -140,8 +140,8 @@ export function Settings({
                 name="Now playing stars position"
                 field="nowPlayingStarsPosition"
                 options={{
-                    left: "left",
-                    right: "right",
+                    Left: "left",
+                    Right: "right",
                 }}
                 onclick={hanleNowPlayingStarsPositionDropdownClick}
             />
