@@ -17,4 +17,4 @@ Settings, such as enabling/disabling half star ratings, can be accessed from the
 
 ## Credits
 
-Thanks to [Tetrax-10](https://github.com/Tetrax-10) for the playlist sorting code
+Thanks to [Tetrax-10](https://github.com/Tetrax-10) for the [playlist sorting code](https://github.com/Tetrax-10/Spicetify-Extensions/tree/master/Sort-by-Rating)

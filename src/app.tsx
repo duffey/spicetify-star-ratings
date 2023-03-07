@@ -510,7 +510,8 @@ async function main() {
                 ratingsLoading = false;
             });
         },
-        shouldAddContextMenuOnFolders
+        shouldAddContextMenuOnFolders,
+        "playlist-folder"
     ).register();
 
     new Spicetify.ContextMenu.Item(
@@ -532,7 +533,8 @@ async function main() {
                 }),
             });
         },
-        shouldAddContextMenuOnPlaylists
+        shouldAddContextMenuOnPlaylists,
+        "visualizer"
     ).register();
 
     const observer = new MutationObserver(async () => {
