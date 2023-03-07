@@ -349,12 +349,15 @@ async function observerCallback(keys) {
     if (getNowPlayingHeart()) getNowPlayingHeart().style.display = settings.hideHearts ? "none" : "flex";
 
     oldNowPlayingWidget = nowPlayingWidget;
-    nowPlayingWidget = document.querySelector(".main-nowPlayingWidget-nowPlaying .main-trackInfo-container");
+    let selector =
+        settings.nowPlayingStarsPosition === "left" ? ".main-nowPlayingWidget-nowPlaying .main-trackInfo-container" : ".main-nowPlayingBar-right div";
+    nowPlayingWidget = document.querySelector(selector);
     if (nowPlayingWidget && !nowPlayingWidget.isEqualNode(oldNowPlayingWidget)) {
         nowPlayingWidgetStarData = createStars("now-playing", 16);
         nowPlayingWidgetStarData[0].style.marginLeft = "8px";
         nowPlayingWidgetStarData[0].style.marginRight = "8px";
-        nowPlayingWidget.after(nowPlayingWidgetStarData[0]);
+        if (settings.nowPlayingStarsPosition === "left") nowPlayingWidget.after(nowPlayingWidgetStarData[0]);
+        else nowPlayingWidget.prepend(nowPlayingWidgetStarData[0]);
         addStarsListeners(nowPlayingWidgetStarData, getNowPlayingTrackUri, getNowPlayingHeart);
         updateNowPlayingWidget();
         if (settings.enableKeyboardShortcuts) {
@@ -479,11 +482,23 @@ async function main() {
 
     const registerKeyboardShortcuts = getRegisterKeyboardShortcuts(keys);
     const deregisterKeyboardShortcuts = getDeregisterKeyboardShortcuts(keys);
+    const redrawNowPlayingStars = () => {
+        if (nowPlayingWidgetStarData) nowPlayingWidgetStarData[0].remove();
+        nowPlayingWidget = null;
+        observerCallback(keys);
+    };
 
     new Spicetify.Menu.Item("Star Ratings", false, () => {
         Spicetify.PopupModal.display({
             title: "Star Ratings",
-            content: Settings({ settings, registerKeyboardShortcuts, deregisterKeyboardShortcuts, updateTracklist, restoreTracklist }),
+            content: Settings({
+                settings,
+                registerKeyboardShortcuts,
+                deregisterKeyboardShortcuts,
+                updateTracklist,
+                restoreTracklist,
+                redrawNowPlayingStars,
+            }),
             isLarge: true,
         });
     }).register();

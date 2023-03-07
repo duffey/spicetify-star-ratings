@@ -7,6 +7,7 @@ export function getSettings() {
         hideHearts: false,
         enableKeyboardShortcuts: true,
         showPlaylistStars: true,
+        nowPlayingStarsPosition: "left",
     };
     settings = {};
     try {

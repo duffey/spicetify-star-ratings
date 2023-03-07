@@ -45,8 +45,8 @@ function DropdownItem({ settings, name, field, options, onclick }) {
     const [value, setValue] = Spicetify.React.useState(settings[field]);
 
     function handleOnChange(event) {
-        setValue(e.target.value);
-        settings[field] = e.target.value;
+        setValue(event.target.value);
+        settings[field] = event.target.value;
         saveSettings(settings);
         if (onclick) onclick();
     }
@@ -81,7 +81,14 @@ function Heading({ value }) {
     return <h2 className="Type__TypeElement-goli3j-0 bcTfIx main-keyboardShortcutsHelpModal-sectionHeading">{value}</h2>;
 }
 
-export function Settings({ settings, registerKeyboardShortcuts, deregisterKeyboardShortcuts, updateTracklist, restoreTracklist }) {
+export function Settings({
+    settings,
+    registerKeyboardShortcuts,
+    deregisterKeyboardShortcuts,
+    updateTracklist,
+    restoreTracklist,
+    redrawNowPlayingStars,
+}) {
     function handleHideHeartsCheckboxClick(hideHearts) {
         const nowPlayingWidgetHeart = document.querySelector(".control-button-heart");
         if (nowPlayingWidgetHeart) nowPlayingWidgetHeart.style.display = settings.hideHearts ? "none" : "flex";
@@ -97,6 +104,10 @@ export function Settings({ settings, registerKeyboardShortcuts, deregisterKeyboa
     function handleShowPlaylistStarsCheckboxClick() {
         if (settings.showPlaylistStars) updateTracklist();
         else restoreTracklist();
+    }
+
+    function hanleNowPlayingStarsPositionDropdownClick() {
+        redrawNowPlayingStars();
     }
 
     return (
@@ -123,6 +134,16 @@ export function Settings({ settings, registerKeyboardShortcuts, deregisterKeyboa
                     "4.5": "4.5",
                     "5.0": "5.0",
                 }}
+            />
+            <DropdownItem
+                settings={settings}
+                name="Now playing stars position"
+                field="nowPlayingStarsPosition"
+                options={{
+                    left: "left",
+                    right: "right",
+                }}
+                onclick={hanleNowPlayingStarsPositionDropdownClick}
             />
             <Heading value="Keyboard Shortcuts" />
             <ul>
