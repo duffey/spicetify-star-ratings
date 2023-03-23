@@ -256,6 +256,7 @@ function updateTracklist() {
         "[index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var3] 2fr [last] minmax(120px,1fr)",
     ];
 
+    let newTracklistHeaderCss = null;
     const tracklistHeaders = document.querySelectorAll(".main-trackList-trackListHeaderRow");
     // No tracklist header on Artist page
     tracklistHeaders.forEach((tracklistHeader) => {
@@ -263,8 +264,10 @@ function updateTracklist() {
         let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
 
         if (!originalTracklistHeaderCss) originalTracklistHeaderCss = getComputedStyle(tracklistHeader).gridTemplateColumns;
-        if (originalTracklistHeaderCss && tracklistColumnCss[colIndexInt])
+        if (originalTracklistHeaderCss && tracklistColumnCss[colIndexInt]) {
             tracklistHeader.style["grid-template-columns"] = tracklistColumnCss[colIndexInt];
+            newTracklistHeaderCss = tracklistColumnCss[colIndexInt];
+        }
     });
 
     for (const tracklist of tracklists) {
@@ -293,7 +296,8 @@ function updateTracklist() {
                 track.insertBefore(ratingColumn, lastColumn);
 
                 if (!originalTracklistTrackCss) originalTracklistTrackCss = getComputedStyle(track).gridTemplateColumns;
-                if (tracklistColumnCss[colIndexInt]) track.style["grid-template-columns"] = tracklistColumnCss[colIndexInt];
+                if (tracklistColumnCss[colIndexInt])
+                    track.style["grid-template-columns"] = newTracklistHeaderCss ? newTracklistHeaderCss : tracklistColumnCss[colIndexInt];
             }
 
             if (!heart || !trackUri || hasStars || !isTrack) continue;
