@@ -8,6 +8,7 @@ export function getSettings() {
         enableKeyboardShortcuts: true,
         showPlaylistStars: true,
         nowPlayingStarsPosition: "left",
+        skipThreshold: "disabled",
     };
     settings = {};
     try {

@@ -512,6 +512,12 @@ async function main() {
     });
 
     Spicetify.Player.addEventListener("songchange", () => {
+        const trackUri = Spicetify.Player.data.track.uri;
+        if (trackUri in ratings && settings.skipThreshold !== "disabled" && ratings[trackUri] <= parseFloat(settings.skipThreshold)) {
+            Spicetify.Player.next();
+            return;
+        }
+
         updateNowPlayingWidget();
     });
 
