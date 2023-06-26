@@ -36,8 +36,10 @@ export async function createFolder(name) {
     await Spicetify.Platform.RootlistAPI.createFolder(name, { before: "" });
 }
 
-export async function getAlbum(albumId) {
-    return await Spicetify.CosmosAsync.get(`wg://album/v1/album-app/album/${albumId}/desktop`);
+export async function getAlbum(uri) {
+    const { queryAlbumTracks } = Spicetify.GraphQL.Definitions;
+    const { data, errors } = await Spicetify.GraphQL.Request(queryAlbumTracks, { uri, offset: 0, limit: 500 });
+    return data;
 }
 
 export async function getContents() {
@@ -75,6 +77,7 @@ export async function deleteTrackFromPlaylist(playlistUri, trackUri) {
 
 export async function getPlaylistItems(uri) {
     const result = await Spicetify.CosmosAsync.get(`sp://core-playlist/v1/playlist/${uri}`);
+    console.log("PLAYLIST RESULT", result);
     return result.items;
 }
 

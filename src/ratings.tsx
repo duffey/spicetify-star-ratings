@@ -91,11 +91,11 @@ export async function deleteLowestRatings(playlistUris, ratings) {
 }
 
 export function getAlbumRating(ratings, album) {
-    const tracks = album.discs[0].tracks;
+    const items = album.albumUnion.tracks.items;
     let sumRatings = 0.0;
     let numRatings = 0;
-    for (const track of tracks) {
-        const rating = ratings[track.uri];
+    for (const item of items) {
+        const rating = ratings[item.track.uri];
         if (!rating) continue;
         sumRatings += parseFloat(rating);
         numRatings += 1;
