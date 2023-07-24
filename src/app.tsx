@@ -65,6 +65,7 @@ function getTracklistTrackUri(tracklistElement) {
     return (
         values[0]?.pendingProps?.children[0]?.props?.children?.props?.uri ||
         values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.uri ||
+        values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.children?.props?.uri ||
         values[0]?.pendingProps?.children[0]?.props?.children[0]?.props?.uri
     );
 }
