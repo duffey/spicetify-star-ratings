@@ -275,9 +275,9 @@ function updateTracklist() {
         const tracks = tracklist.getElementsByClassName("main-trackList-trackListRow");
         for (const track of tracks) {
             const getHeart = () => {
-                return track.getElementsByClassName("main-addButton-button")[0];
+                return track.getElementsByClassName("main-addButton-button")[0] ?? track.querySelector(".main-trackList-rowHeartButton");
             };
-            const heart = track.getElementsByClassName("main-addButton-button")[0];
+            const heart = track.getElementsByClassName("main-addButton-button")[0] ?? track.querySelector(".main-trackList-rowHeartButton");
             const hasStars = track.getElementsByClassName("stars").length > 0;
             const trackUri = getTracklistTrackUri(track);
             const isTrack = trackUri.includes("track");
