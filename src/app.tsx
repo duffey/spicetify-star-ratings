@@ -61,12 +61,12 @@ function trackUriToTrackId(trackUri) {
 function getTracklistTrackUri(tracklistElement) {
     let values = Object.values(tracklistElement);
     if (!values) return null;
-
+    const searchFrom = values[0]?.pendingProps?.children[0]?.props?.children;
     return (
-        values[0]?.pendingProps?.children[0]?.props?.children?.props?.uri ||
-        values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.uri ||
-        values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.children?.props?.uri ||
-        values[0]?.pendingProps?.children[0]?.props?.children[0]?.props?.uri
+        searchFrom?.props?.uri ||
+        searchFrom?.props?.children?.props?.uri ||
+        searchFrom?.props?.children?.props?.children?.props?.uri ||
+        searchFrom[0]?.props?.uri
     );
 }
 
@@ -275,9 +275,9 @@ function updateTracklist() {
         const tracks = tracklist.getElementsByClassName("main-trackList-trackListRow");
         for (const track of tracks) {
             const getHeart = () => {
-                return track.getElementsByClassName("main-addButton-button")[0] ?? track.querySelector(".main-trackList-rowHeartButton");
+                return track.getElementsByClassName("main-addButton-button")[0] ?? track.querySelector(".main-trackList-rowHeartButton") ?? track.querySelector("button[class*='buttonTertiary-iconOnly']") ?? track.querySelector("button[aria-label='Add to playlist']");
             };
-            const heart = track.getElementsByClassName("main-addButton-button")[0] ?? track.querySelector(".main-trackList-rowHeartButton");
+            const heart = getHeart();
             const hasStars = track.getElementsByClassName("stars").length > 0;
             const trackUri = getTracklistTrackUri(track);
             const isTrack = trackUri.includes("track");
