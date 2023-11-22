@@ -75,7 +75,7 @@ function getNowPlayingHeart() {
 }
 
 const getNowPlayingTrackUri = () => {
-    return Spicetify.Player.data.track.uri;
+    return Spicetify.Player.data.item.uri;
 };
 
 function updateAlbumRating() {
@@ -394,7 +394,7 @@ function updateNowPlayingWidget() {
     if (!nowPlayingWidgetStarData) return;
 
     const getTrackUri = () => {
-        return Spicetify.Player.data.track.uri;
+        return Spicetify.Player.data.item.uri;
     };
     const trackUri = getTrackUri();
     const isTrack = trackUri.includes("track");
@@ -513,7 +513,7 @@ async function main() {
     });
 
     Spicetify.Player.addEventListener("songchange", () => {
-        const trackUri = Spicetify.Player.data.track.uri;
+        const trackUri = Spicetify.Player.data.item.uri;
         if (trackUri in ratings && settings.skipThreshold !== "disabled" && ratings[trackUri] <= parseFloat(settings.skipThreshold)) {
             Spicetify.Player.next();
             return;
