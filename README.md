@@ -11,6 +11,9 @@ I have since written [Spicetify Playlist Labels](https://github.com/duffey/spice
 ### Spicetify Playlist Labels
 I developed [Spicetify Playlist Labels](https://github.com/duffey/spicetify-playlist-labels) because I gradually realized I only wanted to listen to 4-star and above tracks. I only needed a way to distinguish 4 and 5-star tracks. I put the latter in "Favorites." While brainstorming a way to modify this extension, I had the idea for [Spicetify Playlist Labels](https://github.com/duffey/spicetify-playlist-labels), which is a much more flexible system that can be used for more than just rating.
 
+#### Update: Star Playlist Images!
+[WildGenius](https://github.com/WildGenius) made some [playlist images](https://github.com/duffey/spicetify-playlist-labels#star-rating-playlist-images) for star ratings to use with [Spicetify Playlist Labels](https://github.com/duffey/spicetify-playlist-labels)!
+
 ## Install
 
 1. Install [Spicetify](https://spicetify.app)
